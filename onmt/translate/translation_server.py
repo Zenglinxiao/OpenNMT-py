@@ -14,7 +14,7 @@ import torch
 import onmt.opts
 
 from onmt.utils.logging import init_logger
-from onmt.utils.misc import set_random_seed
+from onmt.utils.misc import set_random_seed, to_word_align
 from onmt.utils.parse import ArgumentParser
 from onmt.translate.translator import build_translator
 
@@ -448,21 +448,23 @@ class ServerModel(object):
         scores = [score_tensor.item()
                   for score_tensor in flatten_list(scores)]
 
-        results = [self.maybe_detokenize(item)
-                   for item in results]
+        results = [self.maybe_detokenize_with_align(result, src)
+                   for result, src in zip(results, texts_to_translate)]
 
-        results = [self.maybe_postprocess(item)
-                   for item in results]
+        aligns = [align for _, align in results]
+        results = [self.maybe_postprocess(seq) for seq, _ in results]
+
         # build back results with empty texts
         for i in empty_indices:
             results.insert(i, "")
+            aligns.insert(i, None)
             scores.insert(i, 0)
 
         results = ["".join(items)
                    for items in zip(head_spaces, results, tail_spaces)]
 
         self.logger.info("Translation Results: %d", len(results))
-        return results, scores, self.opt.n_best, timer.times
+        return results, scores, self.opt.n_best, timer.times, aligns
 
     def do_timeout(self):
         """Timeout function that frees GPU memory.
@@ -579,6 +581,28 @@ class ServerModel(object):
             tok = " ".join(tok)
         return tok
 
+    def maybe_detokenize_with_align(self, sequence, src):
+        """De-tokenize (or not) the sequence (with alignment).
+
+        Args:
+            sequence (str): The sequence to detokenize, possible with
+                alignment seperate by ` ||| `.
+
+        Returns:
+            sequence (str): The detokenized sequence.
+            align (str): The alignment correspand to detokenized src/tgt
+                sorted or None if no alignment in output.
+        """
+        align = None
+        if self.opt.report_align:
+            # output contain alignment
+            sequence, align = sequence.split(' ||| ')
+            align = self.maybe_convert_align(src, sequence, align)
+            align_pair = sorted(align.split(' '), key=lambda x: x[-1])
+            align = ' '.join(sorted(align_pair, key=lambda x: x[0]))
+        sequence = self.maybe_detokenize(sequence)
+        return (sequence, align)
+
     def maybe_detokenize(self, sequence):
         """De-tokenize the sequence (or not)
 
@@ -604,6 +628,40 @@ class ServerModel(object):
             detok = self.tokenizer.detokenize(sequence.split())
 
         return detok
+
+    def maybe_convert_align(self, src, tgt, align):
+        """Convert alignment to match detokenized src/tgt (or not).
+
+        Args:
+            src (str): The tokenized source sequence.
+            tgt (str): The tokenized target sequence.
+            align (str): The alignment correspand to src/tgt pair.
+
+        Returns:
+            align (str): The alignment correspand to detokenized src/tgt.
+        """
+        if self.tokenizer_opt is not None and ''.join(tgt.split()) != '':
+            return self.convert_align(src, tgt, align, self.tokenizer_opt)
+        return align
+
+    def convert_align(self, src, tgt, align, tok_opts):
+        """Convert alignment to match detokenized src/tgt.
+
+        Same args/returns as :func:`maybe_convert_align()`
+        """
+        if tok_opts["type"] == "pyonmttok":
+            if tok_opts["params"]["joiner_annotate"]:
+                mode = 'joiner'
+            elif tok_opts["params"]["spacer_annotate"]:
+                mode = 'spacer'
+            else:
+                raise ValueError("Tokenize marker (joiner/spacer) should"
+                                 " be used if want get word alignment!")
+        elif tok_opts["type"] == "sentencepiece":
+            mode = 'spacer'
+        else:
+            raise ValueError("This method has not been implemented yet!")
+        return to_word_align(src, tgt, align, mode)
 
     def maybe_postprocess(self, sequence):
         """Postprocess the sequence (or not)
