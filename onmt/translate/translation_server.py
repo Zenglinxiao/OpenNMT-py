@@ -15,7 +15,7 @@ import onmt.opts
 
 from onmt.utils.logging import init_logger
 from onmt.utils.misc import set_random_seed
-from onmt.utils.alignment import to_word_align
+from onmt.utils.alignment import to_word_align, cover_translation
 from onmt.utils.parse import ArgumentParser
 from onmt.translate.translator import build_translator
 
@@ -388,6 +388,7 @@ class ServerModel(object):
                 timer.tick(name="to_gpu")
 
         texts = []
+        term_dicts = []
         head_spaces = []
         tail_spaces = []
         sslength = []
@@ -409,6 +410,7 @@ class ServerModel(object):
                 preprocessed_src = self.maybe_preprocess(src.strip())
                 tok = self.maybe_tokenize(preprocessed_src)
                 texts.append(tok)
+                term_dicts.append(inp.get('term_dict', None))
                 sslength.append(len(tok.split()))
                 tail_spaces.append(whitespaces_after)
 
@@ -445,12 +447,17 @@ class ServerModel(object):
         #       we can ignore that (i.e. flatten lists) only because
         #       we restrict `n_best=1`
         def flatten_list(_list): return sum(_list, [])
+        tiled_texts = [t for t in texts_to_translate
+                       for _ in range(self.opt.n_best)]
+        tiled_term = [d for d in term_dicts
+                      for _ in range(self.opt.n_best)]
         results = flatten_list(predictions)
         scores = [score_tensor.item()
                   for score_tensor in flatten_list(scores)]
 
-        results = [self.maybe_detokenize_with_align(result, src)
-                   for result, src in zip(results, texts_to_translate)]
+        results = [self.maybe_detokenize_with_align(result, src, term_dict)
+                   for result, src, term_dict in zip(
+                       results, tiled_texts, tiled_term)]
 
         aligns = [align for _, align in results]
         results = [self.maybe_postprocess(seq) for seq, _ in results]
@@ -582,7 +589,22 @@ class ServerModel(object):
             tok = " ".join(tok)
         return tok
 
-    def maybe_detokenize_with_align(self, sequence, src):
+    @property
+    def tokenizer_marker(self):
+        if self.tokenizer_opt["type"] == "pyonmttok":
+            if self.tokenizer_opt["params"]["joiner_annotate"]:
+                marker = 'joiner'
+            elif self.tokenizer_opt["params"]["spacer_annotate"]:
+                marker = 'spacer'
+            else:
+                marker = None
+        elif self.tokenizer_opt["type"] == "sentencepiece":
+            marker = 'spacer'
+        else:
+            marker = None
+        return marker
+
+    def maybe_detokenize_with_align(self, sequence, src, term_dict):
         """De-tokenize (or not) the sequence (with alignment).
 
         Args:
@@ -593,16 +615,55 @@ class ServerModel(object):
             sequence (str): The detokenized sequence.
             align (str): The alignment correspand to detokenized src/tgt
                 sorted or None if no alignment in output.
+            term_dict (dict): A dict that contain reserved terminology mapping
         """
         align = None
         if self.opt.report_align:
             # output contain alignment
             sequence, align = sequence.split(' ||| ')
-            align = self.maybe_convert_align(src, sequence, align)
-            align_pair = sorted(align.split(' '), key=lambda x: x[-1])
-            align = ' '.join(sorted(align_pair, key=lambda x: x[0]))
+            if term_dict is None or self.tokenizer_marker != 'joiner':
+                align = self.maybe_convert_align(src, sequence, align)
+                align_pair = sorted(align.split(' '), key=lambda x: x[-1])
+                align = ' '.join(sorted(align_pair, key=lambda x: x[0]))
+            else:
+                sequence = self.aligned_term_mapping_detokenize(
+                    src, sequence, align, term_dict)
+                return (sequence, None)
         sequence = self.maybe_detokenize(sequence)
         return (sequence, align)
+
+    def aligned_term_mapping_detokenize(self, src, tgt, align, term_dict):
+        """A sophisticate function to build term reverved translation
+        by replace the aligned translated token with src_term's mapping
+        in term_dict.
+        Efforts have been taken to escape the effect of punctuations as
+        these tokens may result in overmatch for word level align.
+
+        NOTE: Currently only support sentence tokenized with '￭' joiner.
+        """
+        import pyonmttok
+        naive_tokenizer = pyonmttok.Tokenizer(
+            "aggressive", joiner_annotate=True, joiner="￮")
+        src_words, tgt_words = self.detokenize(src), self.detokenize(tgt)
+        nt_src, _ = naive_tokenizer.tokenize(src_words)
+        nt_tgt, _ = naive_tokenizer.tokenize(tgt_words)
+        masked_srcs = {tok for tok in nt_src if "￮" in tok}
+        masked_tgts = {tok for tok in nt_tgt if "￮" in tok}
+        for marked in masked_srcs:
+            marked_origin = marked.replace('￮', '￭')  # get_origin
+            src = ' '.join([tok.replace(marked_origin, marked)
+                            for tok in src.split()])
+        for marked in masked_tgts:
+            marked_origin = marked.replace('￮', '￭')  # get_origin
+            tgt = ' '.join([tok.replace(marked_origin, marked)
+                            for tok in tgt.split()])
+        escaped_word_align = to_word_align(src, tgt, align, mode="joiner")
+        escaped_src, escaped_tgt = self.detokenize(src), self.detokenize(tgt)
+
+        replaced_tgt = cover_translation(
+            escaped_src, escaped_tgt, escaped_word_align, term_dict)
+        final_tgt = naive_tokenizer.detokenize(replaced_tgt.split())
+        return final_tgt
 
     def maybe_detokenize(self, sequence):
         """De-tokenize the sequence (or not)
@@ -641,28 +702,9 @@ class ServerModel(object):
         Returns:
             align (str): The alignment correspand to detokenized src/tgt.
         """
-        if self.tokenizer_opt is not None and ''.join(tgt.split()) != '':
-            return self.convert_align(src, tgt, align, self.tokenizer_opt)
+        if self.tokenizer_marker is not None and ''.join(tgt.split()) != '':
+            return to_word_align(src, tgt, align, mode=self.tokenizer_marker)
         return align
-
-    def convert_align(self, src, tgt, align, tok_opts):
-        """Convert alignment to match detokenized src/tgt.
-
-        Same args/returns as :func:`maybe_convert_align()`
-        """
-        if tok_opts["type"] == "pyonmttok":
-            if tok_opts["params"]["joiner_annotate"]:
-                mode = 'joiner'
-            elif tok_opts["params"]["spacer_annotate"]:
-                mode = 'spacer'
-            else:
-                raise ValueError("Tokenize marker (joiner/spacer) should"
-                                 " be used if want get word alignment!")
-        elif tok_opts["type"] == "sentencepiece":
-            mode = 'spacer'
-        else:
-            raise ValueError("This method has not been implemented yet!")
-        return to_word_align(src, tgt, align, mode)
 
     def maybe_postprocess(self, sequence):
         """Postprocess the sequence (or not)
