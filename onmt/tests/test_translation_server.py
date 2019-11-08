@@ -124,18 +124,10 @@ class TestServerModel(unittest.TestCase):
             if align_string is not None:
                 self.assertIsInstance(align_string, string_types)
         self.assertEqual(len(results), len(scores))
-        self.assertEqual(len(scores), len(inp))
-        self.assertEqual(n_best, 1)
+        self.assertEqual(len(scores), len(inp) * n_best)
         self.assertEqual(len(time), 1)
         self.assertIsInstance(time, dict)
         self.assertIn("translation", time)
-
-    def test_nbest_init_fails(self):
-        model_id = 0
-        opt = {"models": ["test_model.pt"], "n_best": 2}
-        model_root = TEST_DIR
-        with self.assertRaises(ValueError):
-            ServerModel(opt, model_id, model_root=model_root, load=True)
 
 
 class TestTranslationServer(unittest.TestCase):
