@@ -141,6 +141,7 @@ def check_consecutive(numbers):
 def cover_translation(src, tgt, align, reserve_dict):
     """Given src/tgt sentence pair, for each src_token in reserve_dict,
     replaced its aligned tgt_token with reserve_dict[src_token]."""
+    reserve_dict = {k.strip(): v.strip() for k, v in reserve_dict.items()}
     src_list, tgt_list = src.split(' '), tgt.split(' ')
     # 1. Get begin_index_str to token_index_list mapping dict
     src_tok_lens = [len(tok) for tok in src_list]
@@ -185,10 +186,9 @@ def cover_translation(src, tgt, align, reserve_dict):
                         ])
                         tgt_replace_dict[tgt_substr] = gold_tgt
     if len(tgt_replace_dict) > 0:
-        reserved_tgt = tgt
         for tgt_substr, gold_tgt in tgt_replace_dict.items():
-            reserved_tgt = reserved_tgt.replace(tgt_substr, gold_tgt)
-    return reserved_tgt
+            tgt = tgt.replace(tgt_substr, gold_tgt)
+    return tgt
 
 
 def _search_str_from_tok_list(token_list, target, begin_id=0):

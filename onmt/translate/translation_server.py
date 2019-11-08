@@ -590,17 +590,17 @@ class ServerModel(object):
 
     @property
     def tokenizer_marker(self):
-        if self.tokenizer_opt["type"] == "pyonmttok":
-            if self.tokenizer_opt["params"]["joiner_annotate"]:
-                marker = 'joiner'
-            elif self.tokenizer_opt["params"]["spacer_annotate"]:
-                marker = 'spacer'
-            else:
-                marker = None
-        elif self.tokenizer_opt["type"] == "sentencepiece":
+        marker = None
+        tokenizer_type = self.tokenizer_opt.get('type', None)
+        if tokenizer_type == "pyonmttok":
+            params = self.tokenizer_opt.get('params', None)
+            if params is not None:
+                if params.get("joiner_annotate", None) is not None:
+                    marker = 'joiner'
+                elif params.get("spacer_annotate", None) is not None:
+                    marker = 'spacer'
+        elif tokenizer_type == "sentencepiece":
             marker = 'spacer'
-        else:
-            marker = None
         return marker
 
     def maybe_detokenize_with_align(self, sequence, src, term_dict):
