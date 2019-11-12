@@ -110,6 +110,7 @@ def to_word_align(src, tgt, subword_align, mode):
 
 
 def subword_map_by_joiner(subwords, marker='￭'):
+    """Return word id for each subword token (annotate by joiner)."""
     flags = [0] * len(subwords)
     for i, tok in enumerate(subwords):
         if tok.endswith(marker):
@@ -125,6 +126,7 @@ def subword_map_by_joiner(subwords, marker='￭'):
 
 
 def subword_map_by_spacer(subwords, marker='▁'):
+    """Return word id for each subword token (annotate by spacer)."""
     word_group = list(accumulate([int(marker in x) for x in subwords]))
     if word_group[0] == 1:  # when dummy prefix is set
         word_group = [item - 1 for item in word_group]
@@ -132,6 +134,7 @@ def subword_map_by_spacer(subwords, marker='▁'):
 
 
 def check_consecutive(numbers):
+    """Return if the argument is a list contains consecutive numbers."""
     numbers = sorted(numbers)
     min_number = numbers[0]
     consecutive_list = list(range(min_number, min_number + len(numbers)))
@@ -192,6 +195,7 @@ def cover_translation(src, tgt, align, reserve_dict):
 
 
 def _search_str_from_tok_list(token_list, target, begin_id=0):
+    """Search `target` token from token_list from index `begin_id`."""
     candidate_ids = None
     for current_id in range(begin_id, len(token_list)):
         candidate = ' '.join(token_list[begin_id: current_id + 1])
@@ -199,3 +203,22 @@ def _search_str_from_tok_list(token_list, target, begin_id=0):
             candidate_ids = list(range(begin_id, current_id + 1))
             break
     return candidate_ids
+
+
+def spacer2joiner(sequence, joiner='￭'):
+    """convert spacer annotated tokenized string to joiner annotation.
+
+    NOTE: We assume the space marker are prefix as in pyonmttok
+    or sentencepiece by default.
+    """
+    toks = sequence.split(' ')
+    for i in range(len(toks)):
+        if i != 0 and not toks[i].startswith('▁'):
+            toks[i] = joiner + toks[i]
+    newstr = ' '.join(toks).replace('▁', '')
+    return newstr
+
+
+def detok_on_joiner(sequence, joiner='￭'):
+    """Detokenize tokenized sentence annotated by joiner."""
+    return sequence.replace(joiner + ' ', '').replace(' ' + joiner, '')

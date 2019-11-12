@@ -15,7 +15,8 @@ import onmt.opts
 
 from onmt.utils.logging import init_logger
 from onmt.utils.misc import set_random_seed
-from onmt.utils.alignment import to_word_align, cover_translation
+from onmt.utils.alignment import to_word_align, cover_translation, \
+    spacer2joiner, detok_on_joiner
 from onmt.utils.parse import ArgumentParser
 from onmt.translate.translator import build_translator
 
@@ -620,14 +621,14 @@ class ServerModel(object):
         if self.opt.report_align:
             # output contain alignment
             sequence, align = sequence.split(' ||| ')
-            if term_dict is None or self.tokenizer_marker != 'joiner':
-                align = self.maybe_convert_align(src, sequence, align)
-                align_pair = sorted(align.split(' '), key=lambda x: x[-1])
-                align = ' '.join(sorted(align_pair, key=lambda x: x[0]))
-            else:
+            if term_dict is not None and self.tokenizer_marker is not None:
                 sequence = self.aligned_term_mapping_detokenize(
                     src, sequence, align, term_dict)
                 return (sequence, None)
+            else:
+                align = self.maybe_convert_align(src, sequence, align)
+                align_pair = sorted(align.split(' '), key=lambda x: x[-1])
+                align = ' '.join(sorted(align_pair, key=lambda x: x[0]))
         sequence = self.maybe_detokenize(sequence)
         return (sequence, align)
 
@@ -638,16 +639,21 @@ class ServerModel(object):
         Efforts have been taken to escape the effect of punctuations as
         these tokens may result in overmatch for word level align.
 
-        NOTE: Currently only support sentence tokenized with '￭' joiner.
+        NOTE: Based on sentence tokenized with '￭' joiner, to handle spacer,
+        We convert sentence into its joiner version.
         """
+        # 1. Capture tokens that marked by a simple Tokenizer
         import pyonmttok
         naive_tokenizer = pyonmttok.Tokenizer(
-            "aggressive", joiner_annotate=True, joiner="￮")
+            "conservative", joiner_annotate=True, joiner="￮")
         src_words, tgt_words = self.detokenize(src), self.detokenize(tgt)
         nt_src, _ = naive_tokenizer.tokenize(src_words)
         nt_tgt, _ = naive_tokenizer.tokenize(tgt_words)
         masked_srcs = {tok for tok in nt_src if "￮" in tok}
         masked_tgts = {tok for tok in nt_tgt if "￮" in tok}
+        # 2. Escape these token from detokenization/2word_align
+        if self.tokenizer_marker == 'spacer':
+            src, tgt = spacer2joiner(src), spacer2joiner(tgt)
         for marked in masked_srcs:
             marked_origin = marked.replace('￮', '￭')  # get_origin
             src = ' '.join([tok.replace(marked_origin, marked)
@@ -656,9 +662,10 @@ class ServerModel(object):
             marked_origin = marked.replace('￮', '￭')  # get_origin
             tgt = ' '.join([tok.replace(marked_origin, marked)
                             for tok in tgt.split()])
+        # 3. Get escaped word align to replace any reserved term if exist
+        # in escaped src/tgt pair
         escaped_word_align = to_word_align(src, tgt, align, mode="joiner")
-        escaped_src, escaped_tgt = self.detokenize(src), self.detokenize(tgt)
-
+        escaped_src, escaped_tgt = detok_on_joiner(src), detok_on_joiner(tgt)
         replaced_tgt = cover_translation(
             escaped_src, escaped_tgt, escaped_word_align, term_dict)
         final_tgt = naive_tokenizer.detokenize(replaced_tgt.split())
