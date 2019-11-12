@@ -72,8 +72,8 @@ def build_align_pharaoh(valid_alignment):
 
     for tgt_id, src_id in enumerate(tgt_align_src_id.tolist()):
         align_pairs.append(str(src_id) + "-" + str(tgt_id))
-    align_pairs.sort(key=lambda x: x[-1])  # sort by tgt_id
-    align_pairs.sort(key=lambda x: x[0])  # sort by src_id
+    align_pairs.sort(key=lambda x: int(x.split('-')[-1]))  # sort by tgt_id
+    align_pairs.sort(key=lambda x: int(x.split('-')[0]))  # sort by src_id
     return align_pairs
 
 
@@ -104,8 +104,8 @@ def to_word_align(src, tgt, subword_align, mode):
         raise ValueError("Invalid value for argument mode!")
     word_align = list({"{}-{}".format(src_map[a], tgt_map[b])
                        for a, b in subword_align})
-    word_align.sort(key=lambda x: x[-1])  # sort by tgt_id
-    word_align.sort(key=lambda x: x[0])  # sort by src_id
+    word_align.sort(key=lambda x: int(x.split('-')[-1]))  # sort by tgt_id
+    word_align.sort(key=lambda x: int(x.split('-')[0]))  # sort by src_id
     return " ".join(word_align)
 
 

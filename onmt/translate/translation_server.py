@@ -627,8 +627,6 @@ class ServerModel(object):
                 return (sequence, None)
             else:
                 align = self.maybe_convert_align(src, sequence, align)
-                align_pair = sorted(align.split(' '), key=lambda x: x[-1])
-                align = ' '.join(sorted(align_pair, key=lambda x: x[0]))
         sequence = self.maybe_detokenize(sequence)
         return (sequence, align)
 
