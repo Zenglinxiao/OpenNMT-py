@@ -3,6 +3,7 @@ import glob
 import os
 import codecs
 import math
+import re
 
 from collections import Counter, defaultdict
 from itertools import chain, cycle
@@ -13,7 +14,8 @@ from torchtext.data import Field, RawField, LabelField
 from torchtext.vocab import Vocab
 from torchtext.data.utils import RandomShuffler
 
-from onmt.inputters.text_dataset import text_fields, TextMultiField
+from onmt.inputters.text_dataset import text_fields, TextMultiField,\
+    DocTextMultiField, text_fields_len
 from onmt.inputters.image_dataset import image_fields
 from onmt.inputters.audio_dataset import audio_fields
 from onmt.inputters.vec_dataset import vec_fields
@@ -102,6 +104,8 @@ def get_fields(
     src_data_type,
     n_src_feats,
     n_tgt_feats,
+    n_src_ctxs=0,
+    n_tgt_ctxs=0,
     pad='<blank>',
     bos='<s>',
     eos='</s>',
@@ -118,6 +122,8 @@ def get_fields(
             ``src_data_type=="text"``, these fields are stored together
             as a ``TextMultiField``).
         n_tgt_feats (int): See above.
+        n_src_ctxs (int): the number of source context to create.
+        n_tgt_ctxs (int): See above.
         pad (str): Special pad symbol. Used on src and tgt side.
         bos (str): Special beginning of sequence symbol. Only relevant
             for tgt.
@@ -148,6 +154,7 @@ def get_fields(
                       "vec": vec_fields}
 
     src_field_kwargs = {"n_feats": n_src_feats,
+                        "n_ctxs": n_src_ctxs,
                         "include_lengths": True,
                         "pad": pad, "bos": None, "eos": None,
                         "truncate": src_truncate,
@@ -155,6 +162,7 @@ def get_fields(
     fields["src"] = fields_getters[src_data_type](**src_field_kwargs)
 
     tgt_field_kwargs = {"n_feats": n_tgt_feats,
+                        "n_ctxs": n_tgt_ctxs,
                         "include_lengths": False,
                         "pad": pad, "bos": bos, "eos": eos,
                         "truncate": tgt_truncate,
@@ -308,9 +316,10 @@ def filter_example(ex, use_src_len=True, use_tgt_len=True,
             will be included).
         max_tgt_len (int or float): Similar to above.
     """
-
-    src_len = len(ex.src[0])
-    tgt_len = len(ex.tgt[0])
+    base_src = ex.src[0][0] if isinstance(ex.src[0], tuple) else ex.src[0]
+    base_tgt = ex.tgt[0][0] if isinstance(ex.tgt[0], tuple) else ex.tgt[0]
+    src_len = len(base_src)
+    tgt_len = len(base_tgt)
     return (not use_src_len or min_src_len <= src_len <= max_src_len) and \
         (not use_tgt_len or min_tgt_len <= tgt_len <= max_tgt_len)
 
@@ -360,6 +369,31 @@ def _build_fv_from_multifield(multifield, counters, build_fv_args,
         logger.info(" * %s vocab size: %d." % (name, len(field.vocab)))
 
 
+def _build_fv_for_textfield(textfield, counters, build_fv_args,
+                            size_multiple=1):
+    if isinstance(textfield, DocTextMultiField):
+        # 1. Update counters for contexts fields
+        for name, ff in textfield:
+            if name not in counters and ff.use_vocab:
+                base_name = re.sub(r'_ctx_\d', '', name)
+                assert base_name in counters,\
+                    f"{base_name} should be count for vocab"
+                counters[name] = counters[base_name]
+        # 2. Build field vocab for every fields
+        for _, multifield in textfield.tm_fields:
+            _build_fv_from_multifield(
+                multifield,
+                counters,
+                build_fv_args,
+                size_multiple=size_multiple)
+    else:
+        _build_fv_from_multifield(
+                textfield,
+                counters,
+                build_fv_args,
+                size_multiple=size_multiple)
+
+
 def _build_fields_vocab(fields, counters, data_type, share_vocab,
                         vocab_size_multiple,
                         src_vocab_size, src_words_min_frequency,
@@ -369,29 +403,27 @@ def _build_fields_vocab(fields, counters, data_type, share_vocab,
         max_size=src_vocab_size, min_freq=src_words_min_frequency)
     build_fv_args["tgt"] = dict(
         max_size=tgt_vocab_size, min_freq=tgt_words_min_frequency)
-    tgt_multifield = fields["tgt"]
-    _build_fv_from_multifield(
-        tgt_multifield,
+    tgt_textfield = fields["tgt"]
+    _build_fv_for_textfield(
+        tgt_textfield,
         counters,
         build_fv_args,
         size_multiple=vocab_size_multiple if not share_vocab else 1)
     if data_type == 'text':
-        src_multifield = fields["src"]
-        _build_fv_from_multifield(
-            src_multifield,
+        src_textfield = fields["src"]
+        _build_fv_for_textfield(
+            src_textfield,
             counters,
             build_fv_args,
             size_multiple=vocab_size_multiple if not share_vocab else 1)
         if share_vocab:
             # `tgt_vocab_size` is ignored when sharing vocabularies
             logger.info(" * merging src and tgt vocab...")
-            src_field = src_multifield.base_field
-            tgt_field = tgt_multifield.base_field
-            _merge_field_vocabs(
-                src_field, tgt_field, vocab_size=src_vocab_size,
+            merged_vocab_size = _merge_field_vocabs(
+                src_textfield, tgt_textfield, vocab_size=src_vocab_size,
                 min_freq=src_words_min_frequency,
                 vocab_size_multiple=vocab_size_multiple)
-            logger.info(" * merged vocab size: %d." % len(src_field.vocab))
+            logger.info(" * merged vocab size: %d." % merged_vocab_size)
 
     return fields
 
@@ -489,10 +521,13 @@ def build_vocab(train_dataset_files, fields, data_type, share_vocab,
     return fields  # is the return necessary?
 
 
-def _merge_field_vocabs(src_field, tgt_field, vocab_size, min_freq,
+def _merge_field_vocabs(src_textfield, tgt_textfield, vocab_size, min_freq,
                         vocab_size_multiple):
+    """Merge text fields src/tgt vocab and return size of final vocab."""
     # in the long run, shouldn't it be possible to do this by calling
     # build_vocab with both the src and tgt data?
+    src_field = src_textfield.base_field
+    tgt_field = tgt_textfield.base_field
     specials = [tgt_field.unk_token, tgt_field.pad_token,
                 tgt_field.init_token, tgt_field.eos_token]
     merged = sum(
@@ -507,6 +542,13 @@ def _merge_field_vocabs(src_field, tgt_field, vocab_size, min_freq,
     src_field.vocab = merged_vocab
     tgt_field.vocab = merged_vocab
     assert len(src_field.vocab) == len(tgt_field.vocab)
+    for textfield in [src_textfield, tgt_textfield]:
+        if isinstance(textfield, DocTextMultiField):
+            ctx_base_fields = [f for f in textfield.base_fields
+                               if f is not textfield.base_field]
+            for ctx_base_field in ctx_base_fields:
+                ctx_base_field.vocab = merged_vocab
+    return len(merged_vocab)
 
 
 def _read_vocab_file(vocab_path, tag):
@@ -807,10 +849,16 @@ def max_tok_len(new, count, sofar):
     if count == 1:
         max_src_in_batch = 0
         max_tgt_in_batch = 0
-    # Src: [<bos> w1 ... wN <eos>]
-    max_src_in_batch = max(max_src_in_batch, len(new.src[0]) + 2)
-    # Tgt: [w1 ... wM <eos>]
-    max_tgt_in_batch = max(max_tgt_in_batch, len(new.tgt[0]) + 1)
+    # Src: [w1 ... wN]
+    new_src_lens = text_fields_len(new, 'src')
+    # max len in new.src among itself (and possibly all its ctxs)
+    max_new_src_len = max(new_src_lens)
+    max_src_in_batch = max(max_src_in_batch, max_new_src_len)
+    # Tgt: [<bos> w1 ... wM <eos>]
+    new_tgt_lens = text_fields_len(new, 'tgt', bos=True, eos=True)
+    # max len in new.tgt among itself (and possibly all its ctxs)
+    max_new_tgt_lens = max(new_tgt_lens)
+    max_tgt_in_batch = max(max_tgt_in_batch, max_new_tgt_lens)
     src_elements = count * max_src_in_batch
     tgt_elements = count * max_tgt_in_batch
     return max(src_elements, tgt_elements)

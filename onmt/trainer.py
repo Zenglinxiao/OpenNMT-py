@@ -163,7 +163,12 @@ class Trainer(object):
         for batch in iterator:
             batches.append(batch)
             if self.norm_method == "tokens":
-                num_tokens = batch.tgt[1:, :, 0].ne(
+                if isinstance(batch.tgt, list):
+                    # batch that composed by DocTextField Example
+                    tgt_base = batch.tgt[0]
+                else:
+                    tgt_base = batch.tgt
+                num_tokens = tgt_base[1:, :, 0].ne(
                     self.train_loss.padding_idx).sum()
                 normalization += num_tokens.item()
             else:
@@ -309,6 +314,7 @@ class Trainer(object):
             stats = onmt.utils.Statistics()
 
             for batch in valid_iter:
+                # TODO: similar treatment should be done as for train_iter
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) \
                                    else (batch.src, None)
                 tgt = batch.tgt
@@ -338,19 +344,34 @@ class Trainer(object):
             self.optim.zero_grad()
 
         for k, batch in enumerate(true_batches):
-            target_size = batch.tgt.size(0)
+
+            if isinstance(batch.tgt, list):
+                tgt_outer, tgt_ctxs = batch.tgt[0], batch.tgt[1:]
+            else:
+                tgt_outer, tgt_ctxs = batch.tgt, None
+
+            target_size = tgt_outer.size(0)
+
             # Truncated BPTT: reminder not compatible with accum > 1
             if self.trunc_size:
                 trunc_size = self.trunc_size
             else:
                 trunc_size = target_size
 
-            src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                else (batch.src, None)
+            if isinstance(batch.src, list):
+                true_src, src_ctxs = batch.src[0], batch.src[1:]
+            else:
+                true_src, src_ctxs = batch.src, None
+
+            src, src_lengths = true_src if isinstance(true_src, tuple) \
+                else (true_src, None)
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
 
-            tgt_outer = batch.tgt
+            # tgt_outer = batch.tgt
+            if src_ctxs is not None or tgt_ctxs is not None:
+                assert trunc_size == target_size,\
+                    "contextual NMT not support bptt."
 
             bptt = False
             for j in range(0, target_size-1, trunc_size):
@@ -362,7 +383,8 @@ class Trainer(object):
                     self.optim.zero_grad()
 
                 outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
-                                            with_align=self.with_align)
+                                            with_align=self.with_align,
+                                            ctxs=(src_ctxs, tgt_ctxs))
                 bptt = True
 
                 # 3. Compute loss.

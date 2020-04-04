@@ -11,6 +11,7 @@ import torch
 
 import onmt.model_builder
 import onmt.inputters as inputters
+from onmt.inputters.text_dataset import text_fields_len
 import onmt.decoders.ensemble
 from onmt.translate.beam_search import BeamSearch
 from onmt.translate.greedy_search import GreedySearch
@@ -55,9 +56,11 @@ def max_tok_len(new, count, sofar):
     if count == 1:
         max_src_in_batch = 0
         # max_tgt_in_batch = 0
-    # Src: [<bos> w1 ... wN <eos>]
-    max_src_in_batch = max(max_src_in_batch, len(new.src[0]) + 2)
-    # Tgt: [w1 ... wM <eos>]
+    # Src: [w1 ... wN]
+    new_src_lens = text_fields_len(new, 'src')
+    # max len in new.src among itself (and possibly all its ctxs)
+    max_new_src_len = max(new_src_lens)
+    max_src_in_batch = max(max_src_in_batch, max_new_src_len)
     src_elements = count * max_src_in_batch
     return src_elements
 
@@ -472,7 +475,8 @@ class Translator(object):
         """
         # (0) add BOS and padding to tgt prediction
         if hasattr(batch, 'tgt'):
-            batch_tgt_idxs = batch.tgt.transpose(1, 2).transpose(0, 2)
+            b_tgt = batch.tgt[0] if isinstance(batch.tgt, list) else batch.tgt
+            batch_tgt_idxs = b_tgt.transpose(1, 2).transpose(0, 2)
         else:
             batch_tgt_idxs = self._align_pad_prediction(
                 predictions, bos=self._tgt_bos_idx, pad=self._tgt_pad_idx)
@@ -547,11 +551,15 @@ class Translator(object):
                                                        decode_strategy)
 
     def _run_encoder(self, batch):
-        src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                           else (batch.src, None)
+        if isinstance(batch.src, list):
+            true_src, src_ctxs = batch.src[0], batch.src[1:]
+        else:
+            true_src, src_ctxs = batch.src, None
+        src, src_lengths = true_src if isinstance(true_src, tuple) \
+            else (true_src, None)
 
         enc_states, memory_bank, src_lengths = self.model.encoder(
-            src, src_lengths)
+            src, src_lengths, ctxs=src_ctxs)
         if src_lengths is None:
             assert not isinstance(memory_bank, tuple), \
                 'Ensemble decoding only supported for text data'
@@ -584,7 +592,7 @@ class Translator(object):
         dec_out, dec_attn = self.model.decoder(
             decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
         )
-
+        # TODO: to be made compatible with doc...
         # Generator forward.
         if not self.copy_attn:
             if "std" in dec_attn:
@@ -712,7 +720,7 @@ class Translator(object):
 
     def _score_target(self, batch, memory_bank, src_lengths,
                       src_vocabs, src_map):
-        tgt = batch.tgt
+        tgt = batch.tgt[0] if isinstance(batch.tgt, list) else batch.tgt
         tgt_in = tgt[:-1]
 
         log_probs, attn = self._decode_and_generate(

@@ -17,7 +17,8 @@ class NMTModel(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False):
+    def forward(self, src, tgt, lengths, bptt=False,
+                with_align=False, ctxs=(None, None)):
         """Forward propagate a `src` and `tgt` pair for training.
         Possible initialized with a beginning decoder state.
 
@@ -33,6 +34,7 @@ class NMTModel(nn.Module):
                 If reset then init_state
             with_align (Boolean): A flag indicating whether output alignment,
                 Only valid for transformer decoder.
+            ctxs (tuple[List or None]): a tuple of src/tgt context Tensor list.
 
         Returns:
             (FloatTensor, dict[str, FloatTensor]):
@@ -42,13 +44,15 @@ class NMTModel(nn.Module):
         """
         dec_in = tgt[:-1]  # exclude last target from inputs
 
-        enc_state, memory_bank, lengths = self.encoder(src, lengths)
+        enc_state, memory_bank, lengths = self.encoder(src, lengths,
+                                                       ctxs=ctxs[0])
 
         if bptt is False:
             self.decoder.init_state(src, memory_bank, enc_state)
         dec_out, attns = self.decoder(dec_in, memory_bank,
                                       memory_lengths=lengths,
-                                      with_align=with_align)
+                                      with_align=with_align,
+                                      ctxs=ctxs[1])
         return dec_out, attns
 
     def update_dropout(self, dropout):

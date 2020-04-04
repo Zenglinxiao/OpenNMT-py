@@ -70,7 +70,7 @@ class ImageEncoder(EncoderBase):
         """Pass in needed options only when modify function definition."""
         pass
 
-    def forward(self, src, lengths=None):
+    def forward(self, src, lengths=None, **kwargs):
         """See :func:`onmt.encoders.encoder.EncoderBase.forward()`"""
 
         batch_size = src.size(0)

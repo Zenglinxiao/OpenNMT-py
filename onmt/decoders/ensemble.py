@@ -36,7 +36,7 @@ class EnsembleEncoder(EncoderBase):
         super(EnsembleEncoder, self).__init__()
         self.model_encoders = nn.ModuleList(model_encoders)
 
-    def forward(self, src, lengths=None):
+    def forward(self, src, lengths=None, **kwargs):
         enc_hidden, memory_bank, _ = zip(*[
             model_encoder(src, lengths)
             for model_encoder in self.model_encoders])

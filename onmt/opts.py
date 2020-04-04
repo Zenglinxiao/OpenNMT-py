@@ -315,6 +315,13 @@ def preprocess_opts(parser):
               choices=StoreLoggingLevelAction.CHOICES,
               default="0")
 
+    # Options most relevant to document-level NMT
+    group = parser.add_argument_group('Doc')
+    group.add('--n_src_ctxs', '-n_src_ctxs', type=int, default=0,
+              help="Number of previous lines used as contexts in source.")
+    group.add('--n_tgt_ctxs', '-n_tgt_ctxs', type=int, default=0,
+              help="Number of previous lines used as contexts in target.")
+
     # Options most relevant to speech
     group = parser.add_argument_group('Speech')
     group.add('--sample_rate', '-sample_rate', type=int, default=16000,
@@ -567,6 +574,13 @@ def train_opts(parser):
               help="Log directory for Tensorboard. "
                    "This is also the name of the run.")
 
+    # Options most relevant to document-level NMT
+    group = parser.add_argument_group('Doc')
+    group.add('--n_src_ctxs', '-n_src_ctxs', type=int, default=0,
+              help="Number of previous lines used as contexts in source.")
+    group.add('--n_tgt_ctxs', '-n_tgt_ctxs', type=int, default=0,
+              help="Number of previous lines used as contexts in target.")
+
     group = parser.add_argument_group('Speech')
     # Options most relevant to speech
     group.add('--sample_rate', '-sample_rate', type=int, default=16000,
@@ -725,6 +739,13 @@ def translate_opts(parser):
                    "is sents. Tokens will do dynamic batching")
     group.add('--gpu', '-gpu', type=int, default=-1,
               help="Device to run on")
+
+    # Options most relevant to document-level NMT
+    group = parser.add_argument_group('Doc')
+    group.add('--n_src_ctxs', '-n_src_ctxs', type=int, default=0,
+              help="Number of previous lines used as contexts in source.")
+    group.add('--n_tgt_ctxs', '-n_tgt_ctxs', type=int, default=0,
+              help="Number of previous lines used as contexts in target.")
 
     # Options most relevant to speech.
     group = parser.add_argument_group('Speech')

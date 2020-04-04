@@ -75,6 +75,12 @@ def process_one_shard(corpus_params, params):
                     all_data = [getattr(ex, name, None)]
                 else:
                     all_data = getattr(ex, name)
+                if isinstance(all_data, tuple):
+                    # this is in mode 'doc'
+                    assert hasattr(field, 'base_tm_field'),\
+                        "tuple data in Example of when DocTextMultiField"
+                    all_data = all_data[0]
+                    f_iter = iter(field.base_tm_field)
                 for (sub_n, sub_f), fd in zip(
                         f_iter, all_data):
                     has_vocab = (sub_n == 'src' and
@@ -259,6 +265,8 @@ def preprocess(opt):
         opt.data_type,
         src_nfeats,
         tgt_nfeats,
+        n_src_ctxs=opt.n_src_ctxs,
+        n_tgt_ctxs=opt.n_tgt_ctxs,
         dynamic_dict=opt.dynamic_dict,
         with_align=opt.train_align[0] is not None,
         src_truncate=opt.src_seq_length_trunc,

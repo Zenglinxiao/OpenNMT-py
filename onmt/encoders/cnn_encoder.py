@@ -34,7 +34,7 @@ class CNNEncoder(EncoderBase):
             opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
             embeddings)
 
-    def forward(self, input, lengths=None, hidden=None):
+    def forward(self, input, lengths=None, hidden=None, **kwargs):
         """See :class:`onmt.modules.EncoderBase.forward()`"""
         self._check_args(input, lengths, hidden)
 
