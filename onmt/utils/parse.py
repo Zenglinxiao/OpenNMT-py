@@ -86,8 +86,6 @@ class ArgumentParser(cfargparse.ArgumentParser):
         # the checkpoint. That way, if there are new options added,
         # the defaults are used.
         opt = cls.defaults(opts.model_opts)
-        # if opt.train_part not in ["context", "all"]:
-        # TODO:
         opt.__dict__.update(ckpt_opt.__dict__)
         return opt
 

@@ -42,16 +42,6 @@ def model_opts(parser):
               help="Use a sin to mark relative words positions. "
                    "Necessary for non-RNN style models.")
 
-    # Global context
-    # group = parser.add_argument_group('Global context')
-    # group.add('-context_type', type=str, default=None,
-    #           choices=['HAN_enc', 'HAN_dec', 'HAN_dec_source',
-    #                    'HAN_dec_context', 'HAN_join'],
-    #           help='Where to consider context: '
-    #                '[HAN_enc|HAN_dec|HAN_dec_source|HAN_dec_context|HAN_join]')
-    # group.add('-context_size', type=int, default=3,
-    #           help='Number of previous sentences.')
-
     group = parser.add_argument_group('Model-Embedding Features')
     group.add('--feat_merge', '-feat_merge', type=str, default='concat',
               choices=['concat', 'sum', 'mlp'],
@@ -79,12 +69,12 @@ def model_opts(parser):
               help='Data type of the model.')
 
     group.add('--encoder_type', '-encoder_type', type=str, default='rnn',
-              choices=['rnn', 'brnn', 'mean', 'transformer', 'cnn'],
+              choices=['rnn', 'brnn', 'mean', 'transformer', 'cnn', 'han'],
               help="Type of encoder layer to use. Non-RNN layers "
                    "are experimental. Options are "
                    "[rnn|brnn|mean|transformer|cnn].")
     group.add('--decoder_type', '-decoder_type', type=str, default='rnn',
-              choices=['rnn', 'transformer', 'cnn'],
+              choices=['rnn', 'transformer', 'cnn', 'han'],
               help="Type of decoder layer to use. Non-RNN layers "
                    "are experimental. Options are "
                    "[rnn|transformer|cnn].")
@@ -246,11 +236,6 @@ def preprocess_opts(parser):
               help="Path to the validation target data")
     group.add('--valid_align', '-valid_align', default=None,
               help="Path(s) to the validation src-tgt alignment")
-
-    # group.add('-train_doc', required=True,
-    #           help="Path to the training document")
-    # group.add('-valid_doc', required=True,
-    #           help="Path to the validation document")
 
     group.add('--src_dir', '-src_dir', default="",
               help="Source directory for image or audio files.")
@@ -425,9 +410,6 @@ def train_opts(parser):
               help="Init parameters with xavier_uniform. "
                    "Required for transformer.")
 
-    # group.add('-train_part', default='all', type=str,
-    #           choices=['all', 'sentences', 'context'],
-    #           help="[all|sentences|context]")
     group.add('--train_from', '-train_from', default='', type=str,
               help="If training from a checkpoint then this is the "
                    "path to the pretrained model's state_dict.")

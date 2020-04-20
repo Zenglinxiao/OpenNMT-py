@@ -6,11 +6,13 @@ from onmt.encoders.cnn_encoder import CNNEncoder
 from onmt.encoders.mean_encoder import MeanEncoder
 from onmt.encoders.audio_encoder import AudioEncoder
 from onmt.encoders.image_encoder import ImageEncoder
+from onmt.encoders.han import HANEncoder
 
 
 str2enc = {"rnn": RNNEncoder, "brnn": RNNEncoder, "cnn": CNNEncoder,
            "transformer": TransformerEncoder, "img": ImageEncoder,
-           "audio": AudioEncoder, "mean": MeanEncoder}
+           "audio": AudioEncoder, "mean": MeanEncoder,
+           "han": HANEncoder}
 
 __all__ = ["EncoderBase", "TransformerEncoder", "RNNEncoder", "CNNEncoder",
-           "MeanEncoder", "str2enc"]
+           "MeanEncoder", "HANEncoder", "str2enc"]
