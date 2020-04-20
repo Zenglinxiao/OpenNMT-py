@@ -206,6 +206,11 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         if model_opt.share_decoder_embeddings:
             generator.linear.weight = decoder.embeddings.word_lut.weight
 
+    # Freeze Generator if needed.
+    if model_opt.generator_mode == 'freeze':
+        for param in generator.parameters():
+            param.require_grad = False
+
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:
         # This preserves backward-compat for models using customed layernorm
