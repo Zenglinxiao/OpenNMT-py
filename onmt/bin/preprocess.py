@@ -193,8 +193,6 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
             align_shards = split_corpus(maybe_align, opt.shard_size)
             for i, (ss, ts, a_s) in enumerate(
                     zip(src_shards, tgt_shards, align_shards)):
-                # NOTE: can here extract doc boundary
-                # ss, ts, doc_boundary = extract_doc_boundary(ss, ts)
                 yield (i, (ss, ts, a_s, maybe_id, filter_pred))
 
     shard_iter = shard_iterator(srcs, tgts, ids, aligns, existing_shards,

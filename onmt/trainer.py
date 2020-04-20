@@ -260,7 +260,6 @@ class Trainer(object):
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: validate step %d'
                                 % (self.gpu_rank, step))
-                # TODO: configure train_part to validate
                 valid_stats = self.validate(
                     valid_iter, moving_average=self.moving_average)
                 if self.gpu_verbose_level > 0:
