@@ -138,6 +138,17 @@ def model_opts(parser):
               help="Type of context gate to use. "
                    "Do not select for no context gate.")
 
+    group = parser.add_argument_group('Global context')
+    group.add('--encoder_mode', '-encoder_mode', type=str, default='all',
+              choices=['all', 'sent', 'context'],
+              help="Used in Han to partially go through the branch.")
+    group.add('--decoder_mode', '-decoder_mode', type=str, default='all',
+              choices=['all', 'sent', 'context'],
+              help="Used in Han to partially go through the branch.")
+    group.add('--generator_mode', '-generator_mode', type=str,
+              default='normal', choices=['normal', 'freeze'],
+              help="optionally freeze the parameters of generator.")
+
     # Attention options
     group = parser.add_argument_group('Model- Attention')
     group.add('--global_attention', '-global_attention',
@@ -423,6 +434,23 @@ def train_opts(parser):
     group.add('--reset_optim', '-reset_optim', default='none',
               choices=['none', 'all', 'states', 'keep_states'],
               help="Optimization resetter when train_from.")
+
+    # Change the mode of model's encoder/decoder: correspond to
+    # -encoder_mode/-decoder_mode in opts.model(), should only be
+    # set when -train_from is set and want to change the existing
+    # options in checkpoints.
+    group.add('--enc_mode', '-enc_mode', type=str, default='none',
+              choices=['none', 'all', 'sent', 'context'],
+              help="override -encoder_mode in an existing checkpoint."
+                   "Default none to disable this option.")
+    group.add('--dec_mode', '-dec_mode', type=str, default='none',
+              choices=['none', 'all', 'sent', 'context'],
+              help="override -decoder_mode in an existing checkpoint."
+                   "Default none to disable this option.")
+    group.add('--gen_mode', '-gen_mode', type=str, default='none',
+              choices=['none', 'normal', 'freeze'],
+              help="override -generator_mode in an existing checkpoint."
+                   "Default none to disable this option.")
 
     # Pretrained word vectors
     group.add('--pre_word_vecs_enc', '-pre_word_vecs_enc',

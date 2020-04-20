@@ -41,6 +41,12 @@ def build_embeddings(opt, text_field, for_encoder=True):
     pad_indices = [f.vocab.stoi[f.pad_token] for _, f in text_field]
     word_padding_idx, feat_pad_indices = pad_indices[0], pad_indices[1:]
 
+    bos_indices = [f.vocab.stoi[f.init_token] for _, f in text_field]
+    word_bos_idx = bos_indices[0]
+
+    eos_indices = [f.vocab.stoi[f.eos_token] for _, f in text_field]
+    word_eos_idx = eos_indices[0]
+
     num_embs = [len(f.vocab) for _, f in text_field]
     num_word_embeddings, num_feat_embeddings = num_embs[0], num_embs[1:]
 
@@ -56,6 +62,8 @@ def build_embeddings(opt, text_field, for_encoder=True):
         dropout=opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
         word_padding_idx=word_padding_idx,
         feat_padding_idx=feat_pad_indices,
+        word_bos_idx=word_bos_idx,
+        word_eos_idx=word_eos_idx,
         word_vocab_size=num_word_embeddings,
         feat_vocab_sizes=num_feat_embeddings,
         sparse=opt.optim == "sparseadam",
@@ -141,6 +149,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     # Build embeddings.
     if model_opt.model_type == "text" or model_opt.model_type == "vec":
         src_field = fields["src"]
+        if hasattr(src_field, 'base_tm_field'):
+            # for DocTextMultiField
+            src_field = src_field.base_tm_field
         src_emb = build_embeddings(model_opt, src_field)
     else:
         src_emb = None
@@ -150,6 +161,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
 
     # Build decoder.
     tgt_field = fields["tgt"]
+    if hasattr(tgt_field, 'base_tm_field'):
+        tgt_field = tgt_field.base_tm_field
     tgt_emb = build_embeddings(model_opt, tgt_field, for_encoder=False)
 
     # Share the embedding matrix - preprocess with share_vocab required.
@@ -196,6 +209,11 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         generator = CopyGenerator(model_opt.dec_rnn_size, vocab_size, pad_idx)
         if model_opt.share_decoder_embeddings:
             generator.linear.weight = decoder.embeddings.word_lut.weight
+
+    # Freeze Generator if needed.
+    if model_opt.generator_mode == 'freeze':
+        for param in generator.parameters():
+            param.require_grad = False
 
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:

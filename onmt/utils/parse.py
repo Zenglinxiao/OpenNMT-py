@@ -92,6 +92,34 @@ class ArgumentParser(cfargparse.ArgumentParser):
         return opt
 
     @classmethod
+    def update_ckpt_opts(cls, ckpt_opt, new_opt):
+        # Update ckpt_opt by those in new_opt, this should only be called
+        # when training from a existing checkpoint while want to change
+        # some setting, like change model's some behavior or frozen some
+        # part of model, etc.
+        assert new_opt.train_from != '',\
+            "This method should only be called when load a checkpoint."
+        if new_opt.enc_mode != 'none':
+            if new_opt.enc_mode != ckpt_opt.encoder_mode:
+                old_enc_mode = ckpt_opt.encoder_mode
+                ckpt_opt.encoder_mode = new_opt.enc_mode
+                logger.info("reset -encoder_mode: {}->{}.".format(
+                    old_enc_mode, ckpt_opt.encoder_mode))
+        if new_opt.dec_mode != 'none':
+            if new_opt.dec_mode != ckpt_opt.decoder_mode:
+                old_dec_mode = ckpt_opt.decoder_mode
+                ckpt_opt.decoder_mode = new_opt.dec_mode
+                logger.info("reset -decoder_mode: {}->{}.".format(
+                    old_dec_mode, ckpt_opt.decoder_mode))
+        if new_opt.gen_mode != 'none':
+            if new_opt.gen_mode != ckpt_opt.generator_mode:
+                old_gen_mode = ckpt_opt.generator_mode
+                ckpt_opt.generator_mode = new_opt.gen_mode
+                logger.info("reset -generator_mode: {}->{}.".format(
+                    old_gen_mode, ckpt_opt.generator_mode))
+        return ckpt_opt
+
+    @classmethod
     def validate_train_opts(cls, opt):
         if opt.epochs:
             raise AssertionError(

@@ -129,6 +129,8 @@ class Embeddings(nn.Module):
     def __init__(self, word_vec_size,
                  word_vocab_size,
                  word_padding_idx,
+                 word_bos_idx=None,
+                 word_eos_idx=None,
                  position_encoding=False,
                  feat_merge="concat",
                  feat_vec_exponent=0.7,
@@ -144,6 +146,9 @@ class Embeddings(nn.Module):
         if feat_padding_idx is None:
             feat_padding_idx = []
         self.word_padding_idx = word_padding_idx
+
+        self.word_bos_idx = word_bos_idx
+        self.word_eos_idx = word_eos_idx
 
         self.word_vec_size = word_vec_size
 
