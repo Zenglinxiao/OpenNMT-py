@@ -141,6 +141,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     # Build embeddings.
     if model_opt.model_type == "text" or model_opt.model_type == "vec":
         src_field = fields["src"]
+        if hasattr(src_field, 'base_tm_field'):
+            # for DocTextMultiField
+            src_field = src_field.base_tm_field
         src_emb = build_embeddings(model_opt, src_field)
     else:
         src_emb = None
@@ -150,6 +153,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
 
     # Build decoder.
     tgt_field = fields["tgt"]
+    if hasattr(tgt_field, 'base_tm_field'):
+        tgt_field = tgt_field.base_tm_field
     tgt_emb = build_embeddings(model_opt, tgt_field, for_encoder=False)
 
     # Share the embedding matrix - preprocess with share_vocab required.

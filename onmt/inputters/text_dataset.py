@@ -12,6 +12,7 @@ class TextDataReader(DataReaderBase):
     def __init__(self, n_src_ctxs, n_tgt_ctxs):
         self.n_src_ctxs = n_src_ctxs
         self.n_tgt_ctxs = n_tgt_ctxs
+        self.doc_format = (n_src_ctxs != 0 or n_tgt_ctxs != 0)
 
     @classmethod
     def from_opt(cls, opt):
@@ -37,10 +38,9 @@ class TextDataReader(DataReaderBase):
             "Cannot use _dir with TextDataReader."
         if isinstance(sequences, str):
             sequences = DataReaderBase._read_file(sequences)
-        if side == 'src' and self.n_src_ctxs != 0:
-            return self.read_with_ctx(sequences, 'src', self.n_src_ctxs)
-        elif side == 'tgt' and self.n_tgt_ctxs != 0:
-            return self.read_with_ctx(sequences, 'tgt', self.n_tgt_ctxs)
+        if self.doc_format:
+            n_ctx = self.n_tgt_ctxs if side == 'tgt' else self.n_src_ctxs
+            return self.read_with_ctx(sequences, side, n_ctx)
         else:
             return self.read_naive(sequences, side)
 
@@ -64,29 +64,29 @@ class TextDataReader(DataReaderBase):
             if seq.rstrip('\n') == '':
                 if len(seqs) != 0:
                     sentexs = docex2sentexs((seqs, idxs), n_ctxs=n_ctx)
-                    for sent, ctxs, idx in sentexs:
-                        yield {side: (sent, ctxs), "indices": idx}
+                    for sentex, idx in sentexs:
+                        yield {side: sentex, "indices": idx}
                 seqs, idxs = [], []
             else:
                 seqs.append(seq)
                 idxs.append(i)
         if len(seqs) != 0:
-            sentexs = docex2sentexs((seqs, idxs))
-            for sent, ctxs, idx in sentexs:
-                # yield {side: sent, side+"_ctxs": ctxs, "indices": idx}
-                yield {side: (sent, ctxs), "indices": idx}
+            sentexs = docex2sentexs((seqs, idxs), n_ctxs=n_ctx)
+            for sentex, idx in sentexs:
+                yield {side: sentex, "indices": idx}
 
 
-def docex2sentexs(docex, n_ctxs=2, pad=''):
+def docex2sentexs(docex, n_ctxs, pad=''):
     """Convert Doc-like example to sentence examples with contexts."""
     seqs, idxs = docex
-    sentex = []
+    sentexs = []
     pad_seqs = [pad] * n_ctxs + seqs
     for i, idx in enumerate(idxs):
         ctxs = pad_seqs[i:i+n_ctxs]
         seq = pad_seqs[i+n_ctxs]
-        sentex.append((seq, ctxs, idx))
-    return sentex
+        sentex = (seq, ctxs) if len(ctxs) > 0 else seq
+        sentexs.append((sentex, idx))
+    return sentexs
 
 
 def text_fields_len(ex, side, bos=False, eos=False):
@@ -378,9 +378,10 @@ class DocTextMultiField(RawField):
         batch_base, batch_ctxs = list(zip(*batch))
         # batch_by_ctx: List[List[List[List[str]]]], index on (n_ctxs, example)
         batch_by_ctx = list(zip(*batch_ctxs))
-        base_proc = self.base_tm_field.process(batch_base)
-        ctxs_proc = [tm_f.process(ctx_b) for (_, tm_f), ctx_b in zip(
-                     self.ctxs_tm_fields, batch_by_ctx)]
+        base_proc = self.base_tm_field.process(batch_base, device=device)
+        ctxs_proc = [tm_f.process(ctx_b, device=device)
+                     for (_, tm_f), ctx_b in zip(
+                        self.ctxs_tm_fields, batch_by_ctx)]
         batched_ctx_text = [base_proc] + ctxs_proc
         return batched_ctx_text
 
