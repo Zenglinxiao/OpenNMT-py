@@ -624,6 +624,82 @@ def _pool(data, batch_size, batch_size_fn, batch_size_multiple,
             yield b
 
 
+class DocumentIterator(torchtext.data.Iterator):
+    """Iterator that yield Document-level examples."""
+    def __init__(self, dataset, batch_size, **kwargs):
+        #  device=None, batch_size_fn=None, train=True,
+        #  shuffle=None, sort_within_batch=None):
+        super(DocumentIterator, self).__init__(dataset, batch_size, **kwargs)
+        self.doc_index, self.doc_range = self.get_context_index(self.data())
+        self.indx = None
+
+    def get_context_index(self, batch):
+        # NOTE: the examples loaded here should be kept in order
+        d_index, d_range, prev_i, i = [False]*len(batch), [], 0, 0
+        for i, m in enumerate(batch):
+            if m.indices in self.dataset.doc_index:
+                # NOTE: example.index in doc_index means
+                #  this is the begining example of a doc
+                d_index[i] = True
+                if prev_i != i:
+                    d_range.append((prev_i, i))
+                prev_i = i
+        if prev_i != i+1:  # +1 to include last example
+            d_range.append((prev_i, i+1))
+        return d_index, d_range
+
+    def document_shuffler(self):
+        shuffler_index = self.random_shuffler(range(len(self.doc_range)))
+        docs, indx = [], []
+        for i in shuffler_index:
+            docs.extend(self.dataset[self.doc_range[i][0]:self.doc_range[i][1]])
+            indx.extend(self.doc_index[self.doc_range[i][0]:self.doc_range[i][1]])
+
+        assert len(docs) == len(self.doc_index), "Error in document indexes"
+        assert len(indx) == len(self.dataset), "Error in document indexes"
+
+        return docs, np.array(indx)
+
+    def create_batches(self):  # override
+        if self.train:
+            data, indx = self.document_shuffler()
+            # NOTE: need to solve batch_size_fn issue in the scenario of doc
+            self.batches = torchtext.data.batch(data, self.batch_size, self.batch_size_fn)
+            self.indx = indx
+        else:
+            self.batches = self.batch_eval()
+            self.indx = np.array(self.doc_index)
+
+    def __iter__(self):
+        while True:
+            self.init_epoch()
+            count = 0
+            for idx, minibatch in enumerate(self.batches):
+                # NOTE: count fast-forward!!!
+                # fast-forward if loaded from state
+                if self._iterations_this_epoch > idx:
+                    continue
+                self.iterations += 1
+                self._iterations_this_epoch += 1
+                # NOTE: from here
+                indx = np.where(self.indx[count:count + len(minibatch)])[0].tolist()
+                count += len(minibatch)
+                yield torchtext.data.Batch(minibatch, self.dataset, self.device, self.train), indx
+            if not self.repeat:
+                raise StopIteration
+
+    def batch_eval(self):
+        for r in self.doc_range:
+            if r[1]-r[0] > self.batch_size:  # NOTE: sent batch_size_fn regium
+                for i in range(int((r[1]-r[0])/self.batch_size)):
+                    yield self.dataset[r[0]+i*self.batch_size:r[0]+i*self.batch_size+self.batch_size]
+                if r[0]+i*self.batch_size+self.batch_size < r[1]:
+                    yield self.dataset[r[0]+i*self.batch_size+self.batch_size:r[1]]
+            else:
+                yield self.dataset[r[0]:r[1]]
+
+
+
 class OrderedIterator(torchtext.data.Iterator):
 
     def __init__(self,
@@ -771,7 +847,8 @@ class DatasetLazyIter(object):
 
     def __init__(self, dataset_paths, fields, batch_size, batch_size_fn,
                  batch_size_multiple, device, is_train, pool_factor,
-                 repeat=True, num_batches_multiple=1, yield_raw_example=False):
+                 repeat=True, num_batches_multiple=1, yield_raw_example=False,
+                 train_part="sentences"):
         self._paths = dataset_paths
         self.fields = fields
         self.batch_size = batch_size
@@ -783,25 +860,45 @@ class DatasetLazyIter(object):
         self.num_batches_multiple = num_batches_multiple
         self.yield_raw_example = yield_raw_example
         self.pool_factor = pool_factor
+        self.train_part = train_part
 
     def _iter_dataset(self, path):
         logger.info('Loading dataset from %s' % path)
         cur_dataset = torch.load(path)
         logger.info('number of examples: %d' % len(cur_dataset))
         cur_dataset.fields = self.fields
-        cur_iter = OrderedIterator(
-            dataset=cur_dataset,
-            batch_size=self.batch_size,
-            pool_factor=self.pool_factor,
-            batch_size_multiple=self.batch_size_multiple,
-            batch_size_fn=self.batch_size_fn,
-            device=self.device,
-            train=self.is_train,
-            sort=False,
-            sort_within_batch=True,
-            repeat=False,
-            yield_raw_example=self.yield_raw_example
-        )
+        if self.train_part == "sentences":
+            cur_iter = OrderedIterator(
+                dataset=cur_dataset,
+                batch_size=self.batch_size,
+                pool_factor=self.pool_factor,
+                batch_size_multiple=self.batch_size_multiple,
+                batch_size_fn=self.batch_size_fn,
+                device=self.device,
+                train=self.is_train,
+                sort=False,
+                sort_within_batch=True,
+                repeat=False,
+                yield_raw_example=self.yield_raw_example
+            )
+        else:
+            # TODO: call DocumentIterator
+            # cur_iter = DocumentIterator(
+            #     dataset=cur_dataset,
+            #     batch_size=self.batch_size,
+            #     # pool_factor=self.pool_factor,
+            #     # batch_size_multiple=self.batch_size_multiple,
+            #     batch_size_fn=self.batch_size_fn,
+            #     device=self.device,
+            #     train=self.is_train,
+            #     # sort=False,
+            #     sort_within_batch=True,
+            #     # repeat=False,
+            #     # yield_raw_example=self.yield_raw_example
+            #     shuffle=False
+            # )
+            raise NotImplementedError
+
         for batch in cur_iter:
             self.dataset = cur_iter.dataset
             yield batch

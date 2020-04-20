@@ -161,6 +161,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         tgt_emb.word_lut.weight = src_emb.word_lut.weight
 
     decoder = build_decoder(model_opt, tgt_emb)
+    # TODO: add context
+    # context = build_context(model_opt, tgt_field.base_field.vocab)
 
     # Build NMTModel(= encoder + decoder).
     if gpu and gpu_id is not None:
@@ -169,7 +171,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         device = torch.device("cuda")
     elif not gpu:
         device = torch.device("cpu")
+    # TODO: add context part & context_type to NMTModel
     model = onmt.models.NMTModel(encoder, decoder)
+    # TODO?: model.model_type = model_opt.model_type
 
     # Build Generator.
     if not model_opt.copy_attn:
@@ -206,9 +210,10 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         checkpoint['model'] = {fix_key(k): v
                                for k, v in checkpoint['model'].items()}
         # end of patch for backward compatibility
-
+        # TODO: Model parameter name change for if train_part == "context"
         model.load_state_dict(checkpoint['model'], strict=False)
         generator.load_state_dict(checkpoint['generator'], strict=False)
+        # TODO: Freeze parameters for if train_part == "context"
     else:
         if model_opt.param_init != 0.0:
             for p in model.parameters():

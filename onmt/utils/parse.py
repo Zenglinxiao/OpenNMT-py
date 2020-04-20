@@ -86,6 +86,8 @@ class ArgumentParser(cfargparse.ArgumentParser):
         # the checkpoint. That way, if there are new options added,
         # the defaults are used.
         opt = cls.defaults(opts.model_opts)
+        # if opt.train_part not in ["context", "all"]:
+        # TODO:
         opt.__dict__.update(ckpt_opt.__dict__)
         return opt
 
@@ -119,6 +121,14 @@ class ArgumentParser(cfargparse.ArgumentParser):
 
         assert len(opt.attention_dropout) == len(opt.dropout_steps), \
             "Number of attention_dropout values must match accum_steps values"
+
+        # assert opt.train_part in ["all", "context", "sentences"], \
+        #     "opt.train_part should be in [all|sentences|context]"
+
+        # if opt.train_part == "context":
+        #     # maybe configure opt.context_type default to 'none'
+        #     assert opt.train_from != '' or opt.context_type == 'none', \
+        #         "Cannot train context alone or in this context_type model\n"
 
     @classmethod
     def validate_translate_opts(cls, opt):

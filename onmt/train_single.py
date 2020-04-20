@@ -52,6 +52,7 @@ def main(opt, device_id, batch_queue=None, semaphore=None):
         checkpoint = torch.load(opt.train_from,
                                 map_location=lambda storage, loc: storage)
         model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
+        # NOTE: Doc_model update model_opt for ['context', 'all']
         ArgumentParser.update_model_opts(model_opt)
         ArgumentParser.validate_model_opts(model_opt)
         logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)

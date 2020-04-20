@@ -112,6 +112,7 @@ class Dataset(TorchtextDataset):
         self.sort_key = sort_key
         can_copy = 'src_map' in fields and 'alignment' in fields
 
+        # NOTE: this will return {'dat[0]': , 'indice':}
         read_iters = [r.read(dat[1], dat[0], dir_) for r, dat, dir_
                       in zip(readers, data, dirs)]
 
@@ -136,6 +137,14 @@ class Dataset(TorchtextDataset):
         for _, nf_list in ex_fields.items():
             assert len(nf_list) == 1
             fields.append(nf_list[0])
+
+        # TODO: change document boundary if will be filtered
+        # doc_index = np.array(doc_index)
+        # if filter_pred is not None:
+        #   for ex in examples:
+        #       if not filter_pred(ex) and ex.indices in doc_index:
+        #           doc_index[doc_index==ex.indices]+=1
+        # self.doc_index = sorted(list(set(doc_index)))
 
         super(Dataset, self).__init__(examples, fields, filter_pred)
 

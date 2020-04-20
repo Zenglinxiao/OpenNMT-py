@@ -252,7 +252,7 @@ class Optimizer(object):
         optim_opt = opt
         optim_state_dict = None
 
-        if opt.train_from and checkpoint is not None:
+        if opt.train_from and checkpoint is not None:  # NOTE
             optim = checkpoint['optim']
             ckpt_opt = checkpoint['opt']
             ckpt_state_dict = {}
@@ -278,7 +278,7 @@ class Optimizer(object):
             elif opt.reset_optim == 'keep_states':
                 # Reset options, keep optimizer.
                 optim_state_dict = ckpt_state_dict
-
+        # TODO: reset_optim if train with context
         optimizer = cls(
             build_torch_optimizer(model, optim_opt),
             optim_opt.learning_rate,

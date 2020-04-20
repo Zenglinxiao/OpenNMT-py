@@ -43,6 +43,10 @@ def check_existing_pt_files(opt, corpus_type, ids, existing_fields):
     return existing_shards
 
 
+# How to corporate document info: confilt with shuffle
+# 1. feed a file contain document boundary: conflit with clean
+# 2. blank line at the boundary: confilt with blank check
+# 3. special token at the front adding the doc info: cleanable
 def process_one_shard(corpus_params, params):
     corpus_type, fields, src_reader, tgt_reader, align_reader, opt,\
          existing_fields, src_vocab, tgt_vocab = corpus_params
@@ -193,6 +197,8 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader,
             align_shards = split_corpus(maybe_align, opt.shard_size)
             for i, (ss, ts, a_s) in enumerate(
                     zip(src_shards, tgt_shards, align_shards)):
+                # NOTE: can here extract doc boundary
+                # ss, ts, doc_boundary = extract_doc_boundary(ss, ts)
                 yield (i, (ss, ts, a_s, maybe_id, filter_pred))
 
     shard_iter = shard_iterator(srcs, tgts, ids, aligns, existing_shards,
