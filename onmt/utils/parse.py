@@ -148,14 +148,6 @@ class ArgumentParser(cfargparse.ArgumentParser):
         assert len(opt.attention_dropout) == len(opt.dropout_steps), \
             "Number of attention_dropout values must match accum_steps values"
 
-        # assert opt.train_part in ["all", "context", "sentences"], \
-        #     "opt.train_part should be in [all|sentences|context]"
-
-        # if opt.train_part == "context":
-        #     # maybe configure opt.context_type default to 'none'
-        #     assert opt.train_from != '' or opt.context_type == 'none', \
-        #         "Cannot train context alone or in this context_type model\n"
-
     @classmethod
     def validate_translate_opts(cls, opt):
         if opt.beam_size != 1 and opt.random_sampling_topk != 1:

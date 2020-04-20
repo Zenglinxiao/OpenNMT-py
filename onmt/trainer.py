@@ -161,12 +161,6 @@ class Trainer(object):
         normalization = 0
         self.accum_count = self._accum_count(self.optim.training_step)
         for batch in iterator:
-            # TODO: Handle doc_HAN by add batch as (batch, doc_index)
-            # if isinstance(batch, tuple):
-            #     batch, doc_idx = batch
-            # else:
-            #     doc_idx = None
-            # batches.append((batch, doc_idx))
             batches.append(batch)
             if self.norm_method == "tokens":
                 if isinstance(batch.tgt, list):
@@ -321,17 +315,6 @@ class Trainer(object):
             stats = onmt.utils.Statistics()
 
             for batch in valid_iter:
-                # TODO: similar treatment should be done as for train_iter
-                # TODO: handle HAN batch
-                # if isinstance(batch, tuple):
-                #     batch, doc_idx = batch
-                # else:
-                #     doc_idx = None
-                # OLD:
-                # src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                #                    else (batch.src, None)
-                # tgt = batch.tgt
-
                 if isinstance(batch.src, list):
                     true_src, src_ctxs = batch.src[0], batch.src[1:]
                 else:
@@ -343,17 +326,10 @@ class Trainer(object):
                 else:
                     tgt, tgt_ctxs = batch.tgt, None
 
+                # F-prop through the model.
                 outputs, attns = valid_model(src, tgt, src_lengths,
                                              with_align=self.with_align,
                                              ctxs=(src_ctxs, tgt_ctxs))
-
-                # F-prop through the model.
-                # TODO: for HAN, this need doc_idx, valid_part
-                # outputs, attns, _ = valid_model(
-                #     src, tgt, src_lengths, with_align=self.with_align,
-                #     context_index=doc_idx, part=valid_part)
-                # outputs, attns = valid_model(src, tgt, src_lengths,
-                #                              with_align=self.with_align)
 
                 # Compute loss.
                 _, batch_stats = self.valid_loss(batch, outputs, attns)
@@ -375,8 +351,6 @@ class Trainer(object):
         if self.accum_count > 1:
             self.optim.zero_grad()
 
-        # NOTE: with HAN, batch is a tuple, containing (batch, doc_idx)
-        # for k, (batch, doc_idx) in enumerate(true_batches):
         for k, batch in enumerate(true_batches):
 
             if isinstance(batch.tgt, list):
@@ -402,14 +376,11 @@ class Trainer(object):
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
 
-            # tgt_outer = batch.tgt
             if src_ctxs is not None or tgt_ctxs is not None:
                 assert trunc_size == target_size,\
                     "contextual NMT not support bptt."
 
-            # dec_state = None  # NOTE: not sure why have this in HAN
-
-            bptt = False  # NOTE: NO BPTT for HAN
+            bptt = False
             for j in range(0, target_size-1, trunc_size):
                 # 1. Create truncated target.
                 tgt = tgt_outer[j: j + trunc_size]
@@ -418,10 +389,6 @@ class Trainer(object):
                 if self.accum_count == 1:
                     self.optim.zero_grad()
 
-                # TODO: for HAN, this need dec_state, doc_idx, train_part
-                # outputs, attns, dec_state = self.model(
-                #     src, tgt, src_lengths, dec_state, with_align=self.with_align,
-                #     context_index=doc_idx, part=train_part)
                 outputs, attns = self.model(src, tgt, src_lengths, bptt=bptt,
                                             with_align=self.with_align,
                                             ctxs=(src_ctxs, tgt_ctxs))

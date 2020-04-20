@@ -783,7 +783,6 @@ class DatasetLazyIter(object):
         self.num_batches_multiple = num_batches_multiple
         self.yield_raw_example = yield_raw_example
         self.pool_factor = pool_factor
-        # self.train_part = train_part
 
     def _iter_dataset(self, path):
         logger.info('Loading dataset from %s' % path)
@@ -803,7 +802,6 @@ class DatasetLazyIter(object):
             repeat=False,
             yield_raw_example=self.yield_raw_example
         )
-
         for batch in cur_iter:
             self.dataset = cur_iter.dataset
             yield batch
