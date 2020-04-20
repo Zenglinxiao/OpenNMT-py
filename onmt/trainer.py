@@ -314,14 +314,21 @@ class Trainer(object):
             stats = onmt.utils.Statistics()
 
             for batch in valid_iter:
-                # TODO: similar treatment should be done as for train_iter
-                src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                                   else (batch.src, None)
-                tgt = batch.tgt
+                if isinstance(batch.src, list):
+                    true_src, src_ctxs = batch.src[0], batch.src[1:]
+                else:
+                    true_src, src_ctxs = batch.src, None
+                src, src_lengths = true_src if isinstance(true_src, tuple) \
+                    else (true_src, None)
+                if isinstance(batch.tgt, list):
+                    tgt, tgt_ctxs = batch.tgt[0], batch.tgt[1:]
+                else:
+                    tgt, tgt_ctxs = batch.tgt, None
 
                 # F-prop through the model.
                 outputs, attns = valid_model(src, tgt, src_lengths,
-                                             with_align=self.with_align)
+                                             with_align=self.with_align,
+                                             ctxs=(src_ctxs, tgt_ctxs))
 
                 # Compute loss.
                 _, batch_stats = self.valid_loss(batch, outputs, attns)
