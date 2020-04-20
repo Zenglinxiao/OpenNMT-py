@@ -375,7 +375,6 @@ class Trainer(object):
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
 
-            # tgt_outer = batch.tgt
             if src_ctxs is not None or tgt_ctxs is not None:
                 assert trunc_size == target_size,\
                     "contextual NMT not support bptt."
