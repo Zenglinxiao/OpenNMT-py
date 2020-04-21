@@ -116,12 +116,27 @@ def batch_producer(generator_to_serve, queues, semaphore, opt):
 
     for device_id, q in cycle(enumerate(queues)):
         b.dataset = None
-        if isinstance(b.src, tuple):
-            b.src = tuple([_.to(torch.device(device_id))
-                           for _ in b.src])
+        if isinstance(b.src, list):
+            device_src = []
+            for sub_src in b.src:
+                if isinstance(sub_src, tuple):
+                    nsub_src = tuple([_.to(torch.device(device_id))
+                                      for _ in sub_src])
+                else:
+                    nsub_src = sub_src.to(torch.device(device_id))
+                device_src.append(nsub_src)
+            b.src = list(device_src)
         else:
-            b.src = b.src.to(torch.device(device_id))
-        b.tgt = b.tgt.to(torch.device(device_id))
+            if isinstance(b.src, tuple):
+                b.src = tuple([_.to(torch.device(device_id))
+                               for _ in b.src])
+            else:
+                b.src = b.src.to(torch.device(device_id))
+        if isinstance(b.tgt, list):
+            b.tgt = list([tgt_sub.to(torch.device(device_id))
+                          for tgt_sub in b.tgt])
+        else:
+            b.tgt = b.tgt.to(torch.device(device_id))
         b.indices = b.indices.to(torch.device(device_id))
         b.alignment = b.alignment.to(torch.device(device_id)) \
             if hasattr(b, 'alignment') else None
