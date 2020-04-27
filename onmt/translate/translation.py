@@ -2,7 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 import torch
-from onmt.inputters.text_dataset import TextMultiField
+from onmt.inputters.text_dataset import TextMultiField, DocTextMultiField
 from onmt.utils.alignment import build_align_pharaoh
 
 
@@ -27,7 +27,7 @@ class TranslationBuilder(object):
         self.data = data
         self.fields = fields
         self._has_text_src = isinstance(
-            dict(self.fields)["src"], TextMultiField)
+            dict(self.fields)["src"], (TextMultiField, DocTextMultiField))
         self.n_best = n_best
         self.replace_unk = replace_unk
         self.phrase_table = phrase_table
@@ -78,18 +78,26 @@ class TranslationBuilder(object):
         # Sorting
         inds, perm = torch.sort(batch.indices)
         if self._has_text_src:
-            src = batch.src[0][:, :, 0].index_select(1, perm)
+            _text_src = batch.src[0] if isinstance(batch.src, list) \
+                else batch.src
+            src = _text_src[0][:, :, 0].index_select(1, perm)
         else:
             src = None
-        tgt = batch.tgt[:, :, 0].index_select(1, perm) \
-            if self.has_tgt else None
+        if self.has_tgt:
+            _text_tgt = batch.tgt[0] if isinstance(batch.tgt, list) \
+                else batch.tgt
+            tgt = _text_tgt[:, :, 0].index_select(1, perm)
+        else:
+            tgt = None
 
         translations = []
         for b in range(batch_size):
             if self._has_text_src:
                 src_vocab = self.data.src_vocabs[inds[b]] \
                     if self.data.src_vocabs else None
-                src_raw = self.data.examples[inds[b]].src[0]
+                _ex_src = self.data.examples[inds[b]].src
+                src_raw = _ex_src[0][0] if isinstance(_ex_src, list) \
+                    else _ex_src[0]
             else:
                 src_vocab = None
                 src_raw = None
