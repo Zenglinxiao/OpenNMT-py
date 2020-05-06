@@ -76,7 +76,7 @@ class TextDataReader(DataReaderBase):
                 yield {side: sentex, "indices": idx}
 
 
-def docex2sentexs(docex, n_ctxs, pad=''):
+def docex2sentexs(docex, n_ctxs, pad='<blank>'):
     """Convert Doc-like example to sentence examples with contexts."""
     seqs, idxs = docex
     sentexs = []

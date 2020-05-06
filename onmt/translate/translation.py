@@ -32,6 +32,8 @@ class TranslationBuilder(object):
         self.replace_unk = replace_unk
         self.phrase_table = phrase_table
         self.has_tgt = has_tgt
+        self.ex_ids_map = {
+            ex.indices: i for i, ex in enumerate(self.data.examples)}
 
     def _build_target_tokens(self, src, src_vocab, src_raw, pred, attn):
         tgt_field = dict(self.fields)["tgt"].base_field
@@ -93,9 +95,10 @@ class TranslationBuilder(object):
         translations = []
         for b in range(batch_size):
             if self._has_text_src:
-                src_vocab = self.data.src_vocabs[inds[b]] \
+                ture_idx = self.ex_ids_map[inds[b].item()]
+                src_vocab = self.data.src_vocabs[ture_idx] \
                     if self.data.src_vocabs else None
-                _ex_src = self.data.examples[inds[b]].src
+                _ex_src = self.data.examples[ture_idx].src
                 src_raw = _ex_src[0][0] if isinstance(_ex_src, list) \
                     else _ex_src[0]
             else:
