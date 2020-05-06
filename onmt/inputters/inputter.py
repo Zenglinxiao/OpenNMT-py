@@ -316,12 +316,19 @@ def filter_example(ex, use_src_len=True, use_tgt_len=True,
             will be included).
         max_tgt_len (int or float): Similar to above.
     """
-    base_src = ex.src[0][0] if isinstance(ex.src[0], tuple) else ex.src[0]
-    base_tgt = ex.tgt[0][0] if isinstance(ex.tgt[0], tuple) else ex.tgt[0]
-    src_len = len(base_src)
-    tgt_len = len(base_tgt)
-    return (not use_src_len or min_src_len <= src_len <= max_src_len) and \
-        (not use_tgt_len or min_tgt_len <= tgt_len <= max_tgt_len)
+    acceptable = True
+    for side in ['src', 'tgt']:
+        ex_field = getattr(ex, side)
+        min_len = min_tgt_len if side == 'tgt' else min_src_len
+        max_len = max_tgt_len if side == 'tgt' else max_src_len
+        use_len = use_tgt_len if side == 'tgt' else use_src_len
+        if isinstance(ex_field, tuple):
+            lens = [len(ex_field[0][0])] + [len(ctx[0]) for ctx in ex_field[1]]
+        else:
+            lens = [len(ex_field[0])]
+        acceptable = acceptable and (
+            not use_len or all(min_len <= f_len <= max_len for f_len in lens))
+    return acceptable
 
 
 def _pad_vocab_to_multiple(vocab, multiple):
