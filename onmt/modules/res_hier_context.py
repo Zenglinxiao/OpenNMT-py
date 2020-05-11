@@ -42,8 +42,8 @@ class ResHierarquicalContext(nn.Module):
             heads, d_model, dropout=attention_dropout)
         self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout)
 
-        self.linear = nn.Linear(2*d_model, d_model)
-        self.sigmoid = nn.Sigmoid()
+        # self.linear = nn.Linear(2*d_model, d_model)
+        # self.sigmoid = nn.Sigmoid()
 
     def forward(self, query, ctxs, contexts):
         """HierarquicalContext module forward.
