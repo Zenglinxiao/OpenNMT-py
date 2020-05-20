@@ -102,7 +102,7 @@ class DecodeStrategy(object):
             [self.batch_size, self.parallel_paths],
             dtype=torch.uint8, device=device)
         if target_prefix is not None:
-            seq_len, batch_size, n_feats = target_prefix.shape()
+            seq_len, batch_size, n_feats = target_prefix.size()
             assert batch_size == self.batch_size * self.parallel_paths,\
                 "forced target_prefix should've extend to same number of path!"
             target_prefix_words = target_prefix[:, :, 0].transpose(0, 1)
@@ -209,17 +209,18 @@ class DecodeStrategy(object):
                 step <= self.target_prefix.size(1)):
             pick_idx = self.target_prefix[:, step - 1].tolist()  # (B)
             pick_coo = [[path_i, pick] for path_i, pick in enumerate(pick_idx)
-                        if pick_idx not in [self.eos, self.pad]]
-            pick_coo = torch.tensor(pick_coo).to(pick_idx)
-            pick_fill_value = torch.ones(
-                [pick_coo.size(0)], dtype=log_probs.dtype)
-            # pickups: Tensor where specified index were set to 1, others 0
-            pickups = torch.sparse_coo_tensor(
-                pick_coo.t(), pick_fill_value,
-                size=log_probs.size(), device=log_probs.device).to_dense()
-            # Adding pickups to log_probs making probabilities of
-            # specified index close to 1
-            log_probs += pickups
+                        if pick not in [self.eos, self.pad]]
+            if len(pick_coo) > 0:
+                pick_coo = torch.tensor(pick_coo).to(self.target_prefix)
+                pick_fill_value = 10000 * torch.ones(
+                    [pick_coo.size(0)], dtype=log_probs.dtype)
+                # pickups: Tensor where specified index were set to 1, others 0
+                pickups = torch.sparse_coo_tensor(
+                    pick_coo.t(), pick_fill_value,
+                    size=log_probs.size(), device=log_probs.device).to_dense()
+                # Adding pickups to log_probs making probabilities of
+                # specified index close to 1
+                log_probs += pickups
         return log_probs
 
     def maybe_update_target_prefix(self, select_index):
