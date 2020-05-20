@@ -611,6 +611,8 @@ def translate_opts(parser):
               help='Source directory for image or audio files')
     group.add('--tgt', '-tgt',
               help='True target sequence (optional)')
+    group.add('--tgt_prefix', '-tgt_prefix', action='store_true',
+              help='Generate predictions begin with provided prefix in -tgt.')
     group.add('--shard_size', '-shard_size', type=int, default=10000,
               help="Divide src and tgt (if applicable) into "
                    "smaller multiple src and tgt files, then "
