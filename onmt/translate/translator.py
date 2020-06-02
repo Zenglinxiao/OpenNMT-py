@@ -23,6 +23,9 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
         out_file = codecs.open(opt.output, 'w+', 'utf-8')
 
+    gold_scores = codecs.open(opt.gold_scores, 'w+', 'utf-8') \
+        if opt.gold_scores is not None else None
+
     load_test_model = onmt.decoders.ensemble.load_test_model \
         if len(opt.models) > 1 else onmt.model_builder.load_test_model
     fields, model, model_opt = load_test_model(opt)
@@ -36,6 +39,7 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
         model_opt,
         global_scorer=scorer,
         out_file=out_file,
+        gold_scores=gold_scores,
         report_align=opt.report_align,
         report_score=report_score,
         logger=logger
@@ -127,6 +131,7 @@ class Translator(object):
             copy_attn=False,
             global_scorer=None,
             out_file=None,
+            gold_scores=None,
             report_align=False,
             report_score=True,
             logger=None,
@@ -180,6 +185,7 @@ class Translator(object):
             raise ValueError(
                 "Coverage penalty requires an attentional decoder.")
         self.out_file = out_file
+        self.gold_scores = gold_scores
         self.report_align = report_align
         self.report_score = report_score
         self.logger = logger
@@ -208,6 +214,7 @@ class Translator(object):
             model_opt,
             global_scorer=None,
             out_file=None,
+            gold_scores=None,
             report_align=False,
             report_score=True,
             logger=None):
@@ -256,6 +263,7 @@ class Translator(object):
             copy_attn=model_opt.copy_attn,
             global_scorer=global_scorer,
             out_file=out_file,
+            gold_scores=gold_scores,
             report_align=report_align,
             report_score=report_score,
             logger=logger,
@@ -363,6 +371,12 @@ class Translator(object):
                 if tgt is not None:
                     gold_score_total += trans.gold_score
                     gold_words_total += len(trans.gold_sent) + 1
+                    if self.gold_scores is not None:
+                        gold_sent = ' '.join(trans.gold_sent)
+                        gold_score = trans.gold_score/(len(trans.gold_sent)+1)
+                        gold_out = f'{gold_score}\t{gold_sent}\n'
+                        self.gold_scores.write(gold_out)
+                        self.gold_scores.flush()
 
                 n_best_preds = [" ".join(pred)
                                 for pred in trans.pred_sents[:self.n_best]]

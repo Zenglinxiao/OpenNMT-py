@@ -124,6 +124,8 @@ class ArgumentParser(cfargparse.ArgumentParser):
     def validate_translate_opts(cls, opt):
         if opt.beam_size != 1 and opt.random_sampling_topk != 1:
             raise ValueError('Can either do beam search OR random sampling.')
+        if opt.gold_scores is not None and opt.tgt is None:
+            raise ValueError('golden tgt should be provided to scores.')
 
     @classmethod
     def validate_preprocess_args(cls, opt):
