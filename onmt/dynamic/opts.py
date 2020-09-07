@@ -33,6 +33,9 @@ def _dynamic_vocab_opts(parser):
     group.add('-share_vocab', '--share_vocab', action='store_true',
               help="Share source and target vocabulary")
 
+    group.add('-dump_vocab', '--dump_vocab', type=str,
+              help="Base path where to dump vocab(s).")
+
     group.add('-src_vocab', '--src_vocab', required=True,
               help="Path to an vocabulary file for src(or shard)."
                    "Format: one word per line.")
@@ -71,6 +74,10 @@ def dynamic_preprocess_opts(parser):
     parser.add_argument(
         '--verbose', '-verbose', action="store_true",
         help="Save transformed sample for each corpus.")
+
+
+def build_vocab_opts(parser):
+    """Options for build_vocab."""
 
 
 def _train_dynamic_data(parser):

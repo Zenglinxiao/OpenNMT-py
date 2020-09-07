@@ -3,43 +3,9 @@ import os
 from onmt.utils.logging import logger
 from onmt.dynamic.transforms import TransformPipe
 
+from collections import Counter
 
 VALID_CORPUS_NAME = 'valid'
-
-
-def make_link(filepath, link, overwrite=False):
-    """Make a soft link with name `link` to `filepath`."""
-    root = os.getcwd()
-    filepath = os.path.join(root, filepath)
-    link = os.path.join(root, link)
-    if not os.path.exists(filepath):
-        raise OSError(f"File not found at {filepath}.")
-    if os.path.exists(link):
-        if not overwrite:
-            logger.warning(f"Link {link} already exist. Skipping")
-            return
-        else:
-            logger.warning(f"Link {link} exist. overwriting it.")
-            os.remove(link)
-    os.symlink(filepath, link)
-
-
-def save_dataset(corpora, save_data, overwrite=False):
-    """Save `corpora` to `save_data`.
-
-    Args:
-        corpora (list): a dictionary of corpus with name as keys;
-        save_data (str): file prefix for saving;
-        overwrite (bool): if overwrite existing corpus.
-    """
-    os.makedirs(os.path.dirname(save_data), exist_ok=True)
-    for corpus_name, corpus_dict in corpora.items():
-        if corpus_name == VALID_CORPUS_NAME:
-            dest_base = "{}.{}".format(save_data, VALID_CORPUS_NAME)
-        else:
-            dest_base = "{}.train_{}".format(save_data, corpus_name)
-        make_link(corpus_dict['path_src'], dest_base + '.src', overwrite)
-        make_link(corpus_dict['path_tgt'], dest_base + '.tgt', overwrite)
 
 
 class ParallelCorpus(object):
@@ -71,46 +37,21 @@ class ParallelCorpus(object):
         return '{}({}, {})'.format(cls_name, self.src, self.tgt)
 
 
-def get_corpus_paths(base_dir, data_basename, corpus_name):
-    if corpus_name != VALID_CORPUS_NAME:
-        src = os.path.join(
-            base_dir,
-            "{}.train_{}.src".format(
-                data_basename, corpus_name))
-        tgt = os.path.join(
-            base_dir,
-            "{}.train_{}.tgt".format(
-                data_basename, corpus_name))
-    else:
-        src = os.path.join(
-            base_dir,
-            "{}.{}.src".format(
-                data_basename, corpus_name))
-        tgt = os.path.join(
-            base_dir,
-            "{}.{}.tgt".format(
-                data_basename, corpus_name))
-    return ParallelCorpus(src, tgt)
-
-
 def get_corpora(opts, is_train=False):
-    base_dir = os.path.dirname(opts.save_data)
-    data_basename = os.path.basename(opts.save_data)
+    corpora_dict = {}
     if is_train:
-        corpora_ids = [c_id for c_id in opts.data.keys()
-                       if c_id != VALID_CORPUS_NAME]
-        if len(corpora_ids) == 0:
-            raise ValueError("Please specify training corpus!")
+        for corpus_id, corpus_dict in opts.data.items():
+            if corpus_id != VALID_CORPUS_NAME:
+                corpora_dict[corpus_id] = ParallelCorpus(
+                    corpus_dict["path_src"],
+                    corpus_dict["path_tgt"])
     else:
         if VALID_CORPUS_NAME in opts.data.keys():
-            corpora_ids = [VALID_CORPUS_NAME]
+            corpora_dict[VALID_CORPUS_NAME] = ParallelCorpus(
+                opts.data[VALID_CORPUS_NAME]["path_src"],
+                opts.data[VALID_CORPUS_NAME]["path_tgt"])
         else:
             return None
-    corpora_dict = {}
-    for corpus_id in corpora_ids:
-        corpus = get_corpus_paths(
-            base_dir, data_basename, corpus_id)
-        corpora_dict[corpus_id] = corpus
     return corpora_dict
 
 
@@ -177,9 +118,12 @@ def build_corpora_iters(corpora, transforms, corpora_info, train=False,
     return corpora_iters
 
 
-def save_transformed_sample(opts, transforms, n_sample=3):
+def save_transformed_sample(opts, transforms, n_sample=3, build_vocab=False):
     """Save transformed data sample as specified in opts."""
     corpora = get_corpora(opts, is_train=True)
+    if build_vocab:
+        counter_src = Counter()
+        counter_tgt = Counter()
     datasets_iterables = build_corpora_iters(
         corpora, transforms,
         opts.data, train=True)
@@ -188,19 +132,21 @@ def save_transformed_sample(opts, transforms, n_sample=3):
     os.makedirs(sample_path, exist_ok=True)
     for c_name, c_iter in datasets_iterables.items():
         dest_base = os.path.join(sample_path, "{}.sample".format(c_name))
-        with open(dest_base, 'w', encoding="utf-8") as f_sample:
+        with open(dest_base + ".src", 'w', encoding="utf-8") as f_src,\
+                open(dest_base + ".tgt", 'w', encoding="utf-8") as f_tgt:
             for i, example in enumerate(c_iter):
                 src, tgt, transform, cid, index = example
                 maybe_item = transform.apply(src, tgt, corpus_name=cid)
-                if maybe_item is not None:
-                    src, tgt = maybe_item
-                example = [src, tgt, index]
-                item_list = []
-                for item in example:
-                    if isinstance(item, list):
-                        item = ' '.join(item)
-                    item_list.append(str(item))
-                line = '\t'.join(item_list)
-                f_sample.write(line + '\n')
+                if maybe_item is None:
+                    continue
+                src, tgt = maybe_item
+                # example = [src, tgt, index]
+                if build_vocab:
+                    counter_src.update(src)
+                    counter_tgt.update(tgt)
+                f_src.write(" ".join(src) + '\n')
+                f_tgt.write(" ".join(tgt) + '\n')
                 if i > n_sample:
                     break
+    if build_vocab:
+        return counter_src, counter_tgt
