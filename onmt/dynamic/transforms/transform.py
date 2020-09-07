@@ -167,7 +167,6 @@ def make_transforms(opts, transforms_cls, fields):
     vocabs = get_vocabs(fields) if fields is not None else None
     transforms = {}
     for name, transform_cls in transforms_cls.items():
-        print("## TRANSFORM", name)
         transform_obj = transform_cls(opts)
         transform_obj.warm_up(vocabs)
         transforms[name] = transform_obj

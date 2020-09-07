@@ -67,8 +67,8 @@ def _dynamic_transform_opts(parser):
 
 def dynamic_preprocess_opts(parser):
     """All options used in dynamic preprocess."""
-    data_config_opts(parser)
-    _dynamic_corpus_opts(parser)
+    # data_config_opts(parser)
+    # _dynamic_corpus_opts(parser)
     _dynamic_vocab_opts(parser)
     _dynamic_transform_opts(parser)
     parser.add_argument(
