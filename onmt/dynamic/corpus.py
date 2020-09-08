@@ -82,15 +82,15 @@ class ParallelCorpusIterator(object):
             logger.info("Transform statistics for {}:\n{}".format(
                 self.cid, report_msg))
 
-    def _add_index(self, stream):
+    def _add_index(self, stream, stride=1, offset=0):
         for i, item in enumerate(stream):
-            yield (*item, i)
+            yield (*item, i * stride + offset)
 
     def _iter_corpus(self):
         corpus_stream = self.corpus.load(stride=self.stride, offset=self.offset)
         tokenized_corpus = self._tokenize(corpus_stream)
         transformed_corpus = self._transform(tokenized_corpus)
-        indexed_corpus = self._add_index(transformed_corpus)
+        indexed_corpus = self._add_index(transformed_corpus, stride=self.stride, offset=self.offset)
         yield from indexed_corpus
 
     def __iter__(self):
