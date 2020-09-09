@@ -6,6 +6,7 @@ from .tokenize import SentencePieceTransform, BPETransform,\
     ONMTTokenizerTransform
 from .sampling import SwitchOutTransform, TokenDropTransform,\
     TokenMaskTransform
+from .bart import BARTNoiseTransform
 
 
 AVAILABLE_TRANSFORMS = {
@@ -16,7 +17,8 @@ AVAILABLE_TRANSFORMS = {
     'switchout': SwitchOutTransform,
     'tokendrop': TokenDropTransform,
     'tokenmask': TokenMaskTransform,
-    'prefix': PrefixSrcTransform
+    'prefix': PrefixSrcTransform,
+    'bart': BARTNoiseTransform
 }
 
 
