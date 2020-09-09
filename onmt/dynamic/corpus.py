@@ -1,10 +1,7 @@
 """Module that contain shard utils for dynamic data."""
 import os
-import re
-from collections import defaultdict
-from itertools import cycle
 from onmt.utils.logging import logger
-from onmt.dynamic.transform import TransformPipe
+from onmt.dynamic.transforms import TransformPipe
 
 
 VALID_CORPUS_NAME = 'valid'

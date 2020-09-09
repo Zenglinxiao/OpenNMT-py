@@ -7,7 +7,7 @@ from onmt.inputters import str2sortkey
 from onmt.inputters.inputter import max_tok_len, OrderedIterator
 
 from onmt.dynamic.corpus import get_corpora, build_corpora_iters
-from onmt.dynamic.transform import load_transforms
+from onmt.dynamic.transforms import load_transforms
 
 
 class DatasetAdapter(object):
