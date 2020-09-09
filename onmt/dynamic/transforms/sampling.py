@@ -1,6 +1,7 @@
 """Transforms relate to hamming distance sampling."""
 import random
 import numpy as np
+from onmt.dynamic.transforms import register_transform
 from .transform import Transform
 
 
@@ -33,6 +34,7 @@ class HammingDistanceSampling(object):
         return chosen_indices
 
 
+@register_transform(name='switchout')
 class SwitchOutTransform(Transform, HammingDistanceSampling):
     """SwitchOut."""
 
@@ -42,6 +44,15 @@ class SwitchOutTransform(Transform, HammingDistanceSampling):
     def warm_up(self, vocabs):
         self.vocab = vocabs
         self.temperature = self.opts.switchout_temperature
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to this Transform."""
+        group = parser.add_argument_group('Transform/SwitchOut')
+        group.add('-switchout_temperature', '--switchout_temperature',
+                  type=float, default=1.0,
+                  help="sampling temperature for switchout. tau^(-1) in paper."
+                  "Smaller value makes data more diverse.")
 
     def _switchout(self, tokens, vocab, stats=None):
         # 1. sample number of tokens to corrupt
@@ -71,12 +82,21 @@ class SwitchOutTransform(Transform, HammingDistanceSampling):
         return '{}={}'.format('switchout_temperature', self.temperature)
 
 
+@register_transform(name='tokendrop')
 class TokenDropTransform(Transform, HammingDistanceSampling):
     """Random drop tokens from sentence."""
 
     def __init__(self, opts):
         super().__init__(opts)
         self.temperature = self.opts.tokendrop_temperature
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to this Transform."""
+        group = parser.add_argument_group('Transform/Token_Drop')
+        group.add('-tokendrop_temperature', '--tokendrop_temperature',
+                  type=float, default=1.0,
+                  help="sampling temperature for token deletion.")
 
     def _token_drop(self, tokens, stats=None):
         # 1. sample number of tokens to corrupt
@@ -101,6 +121,7 @@ class TokenDropTransform(Transform, HammingDistanceSampling):
         return '{}={}'.format('worddrop_temperature', self.temperature)
 
 
+@register_transform(name='tokenmask')
 class TokenMaskTransform(Transform, HammingDistanceSampling):
     """Random mask tokens from src sentence."""
 
@@ -109,6 +130,14 @@ class TokenMaskTransform(Transform, HammingDistanceSampling):
     def __init__(self, opts):
         super().__init__(opts)
         self.temperature = opts.tokenmask_temperature
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to this Transform."""
+        group = parser.add_argument_group('Transform/Token_Mask')
+        group.add('-tokenmask_temperature', '--tokenmask_temperature',
+                  type=float, default=1.0,
+                  help="sampling temperature for token masking.")
 
     @classmethod
     def get_specials(cls, opts):

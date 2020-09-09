@@ -14,6 +14,11 @@ class Transform(object):
         pass
 
     @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to this Transform."""
+        pass
+
+    @classmethod
     def get_specials(cls, opts):
         return (set(), set())
 

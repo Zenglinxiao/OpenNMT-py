@@ -1,6 +1,10 @@
 """Transforms relate to tokenization/subword."""
 from onmt.utils.logging import logger
+from onmt.dynamic.transforms import register_transform
 from .transform import Transform
+
+
+_COMMON_OPT_ADDED = False  # only load common options one time
 
 
 class TokenizerTransform(Transform):
@@ -10,6 +14,26 @@ class TokenizerTransform(Transform):
         """Initialize neccessary options for Tokenizer."""
         super().__init__(opts)
         self._parse_opts()
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to Subword."""
+        global _COMMON_OPT_ADDED
+        if _COMMON_OPT_ADDED is True:
+            return
+        group = parser.add_argument_group('Transform/Subword/Common')
+        group.add('-src_subword_model', '--src_subword_model',
+                  help="Path of subword model for src (or shared).")
+        group.add('-tgt_subword_model', '--tgt_subword_model',
+                  help="Path of subword model for tgt.")
+
+        group.add('-subword_nbest', '--subword_nbest', type=int, default=1,
+                  help="No of (n_best) candidate in subword regularization."
+                  "Valid for unigram sampling, invalid for BPE-dropout.")
+        group.add('-subword_alpha', '--subword_alpha', type=float, default=0,
+                  help="Smoothing param for sentencepiece unigram sampling,"
+                  "and dropout probability for BPE-dropout.")
+        _COMMON_OPT_ADDED = True
 
     def _parse_opts(self):
         raise NotImplementedError
@@ -33,6 +57,7 @@ class TokenizerTransform(Transform):
         self.warm_up()
 
 
+@register_transform(name='sentencepiece')
 class SentencePieceTransform(TokenizerTransform):
     """SentencePiece subword transform class."""
 
@@ -98,6 +123,7 @@ class SentencePieceTransform(TokenizerTransform):
         )
 
 
+@register_transform(name='bpe')
 class BPETransform(TokenizerTransform):
     def __init__(self, opts):
         """Initialize neccessary options for subword_nmt."""
@@ -153,6 +179,7 @@ class BPETransform(TokenizerTransform):
         )
 
 
+@register_transform(name='onmt_tokenize')
 class ONMTTokenizerTransform(TokenizerTransform):
     """OpenNMT Tokenizer transform class."""
 
@@ -160,6 +187,24 @@ class ONMTTokenizerTransform(TokenizerTransform):
         """Initialize neccessary options for OpenNMT Tokenizer."""
         super().__init__(opts)
         self._parse_opts()
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to Subword."""
+        super().add_options(parser)
+        group = parser.add_argument_group('Transform/Subword/ONMTTOK')
+        group.add('-src_subword_type', '--src_subword_type',
+                  type=str, default='none',
+                  choices=['none', 'sentencepiece', 'bpe'],
+                  help="Type of subword model for src (or shared) in onmttok.")
+        group.add('-tgt_subword_type', '--tgt_subword_type',
+                  type=str, default='none',
+                  choices=['none', 'sentencepiece', 'bpe'],
+                  help="Type of subword model for tgt in onmttok.")
+        group.add('-onmttok_kwargs', '--onmttok_kwargs', type=str,
+                  default="{'mode': 'none'}",
+                  help="Accept any OpenNMT Tokenizer's options in dict string,"
+                  "except subword related options listed earlier.")
 
     def _set_subword_opts(self):
         """Set all options relate to subword for OpenNMT/Tokenizer."""

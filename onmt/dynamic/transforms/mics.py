@@ -1,7 +1,9 @@
 from onmt.utils.logging import logger
+from onmt.dynamic.transforms import register_transform
 from .transform import Transform
 
 
+@register_transform(name='filtertoolong')
 class FilterTooLongTransform(Transform):
     """Filter out sentence that are too long."""
 
@@ -9,6 +11,15 @@ class FilterTooLongTransform(Transform):
         super().__init__(opts)
         self.src_seq_length = opts.src_seq_length
         self.tgt_seq_length = opts.tgt_seq_length
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to this Transform."""
+        group = parser.add_argument_group('Transform/Filter')
+        group.add('--src_seq_length', '-src_seq_length', type=int, default=200,
+                  help="Maximum source sequence length")
+        group.add('--tgt_seq_length', '-tgt_seq_length', type=int, default=200,
+                  help="Maximum target sequence length")
 
     def apply(self, src, tgt, stats=None, **kwargs):
         """Return None if too long else return as is."""
@@ -27,6 +38,7 @@ class FilterTooLongTransform(Transform):
         )
 
 
+@register_transform(name='prefix')
 class PrefixSrcTransform(Transform):
     """Add target language Prefix to src sentence."""
 
