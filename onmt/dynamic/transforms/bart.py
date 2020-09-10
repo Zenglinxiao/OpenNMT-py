@@ -55,7 +55,8 @@ class BARTNoising(object):
         if mask_length == 'subword' and replace_length not in [0, 1]:
             raise ValueError(f'if using subwords, use replace-length=1 or 0')
 
-        if mask_length == 'subword':
+        if mask_length == 'subword' or is_joiner is None:
+            # view each subword as word start / input is word level token
             self.__is_word_start = partial(word_start, ignore_subword=True)
         else:
             self.__is_word_start = partial(word_start, is_joiner=is_joiner)
@@ -82,6 +83,8 @@ class BARTNoising(object):
         return True if token in self.full_stop_token else False
 
     def permute_sentences(self, tokens, p=1.0):
+        if len(tokens) == 1:
+            return tokens
         full_stops = np.array([self._is_full_stop(token) for token in tokens])
         # Pretend it ends with a full stop so last span is a sentence
         full_stops[-1] = True
@@ -318,7 +321,7 @@ class BARTNoiseTransform(Transform):
                 raise ValueError(
                     f'src_subword_type={subword_type} incompatible with '
                     f'mask_length={self.opts.mask_length}!')
-        is_joiner = (subword_type == 'bpe')
+        is_joiner = (subword_type == 'bpe') if subword_type != 'none' else None
         self.bart_noise = BARTNoising(
             vocabs,
             mask_tok=MASK_TOK,
