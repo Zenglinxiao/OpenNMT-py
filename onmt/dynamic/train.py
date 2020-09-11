@@ -11,17 +11,36 @@ from onmt.train_single import main as single_main, get_train_iter
 
 from onmt.dynamic.parse import DynamicArgumentParser
 from onmt.dynamic.opts import dynamic_train_opts, dynamic_preprocess_opts
-
+from onmt.dynamic.corpus import save_transformed_sample
 from onmt.dynamic.vocab import build_dynamic_fields, save_fields
-from onmt.dynamic.transform import make_transforms, save_transforms, \
+from onmt.dynamic.transforms import make_transforms, save_transforms, \
     get_specials, get_transforms_cls
 
 # Set sharing strategy manually instead of default based on the OS.
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
-def train(opt):
+def prepare_fields_transforms(opt):
+    """Prepare or dump fields & transforms before training."""
     DynamicArgumentParser.validate_dynamic_corpus(opt)
+    DynamicArgumentParser.get_all_transform(opt)
+
+    transforms_cls = get_transforms_cls(opt._all_transform)
+    specials = get_specials(opt, transforms_cls)
+
+    fields = build_dynamic_fields(
+        opt, src_specials=specials['src'], tgt_specials=specials['tgt'])
+    save_fields(opt, fields)
+
+    transforms = make_transforms(opt, transforms_cls, fields)
+    save_transforms(opt, transforms)
+    if opt.verbose:
+        save_transformed_sample(opt, transforms)
+
+
+def train(opt):
+    if not opt.train_from:
+        prepare_fields_transforms(opt)
 
     DynamicArgumentParser.validate_train_opts(opt)
     DynamicArgumentParser.update_model_opts(opt)
@@ -48,8 +67,6 @@ def train(opt):
     nb_gpu = len(opt.gpu_ranks)
 
     if opt.world_size > 1:
-        # Get the iterator to generate from
-        # train_iter = get_train_iter(opt, dynamic=True)
 
         queues = []
         mp = torch.multiprocessing.get_context('spawn')
@@ -73,6 +90,7 @@ def train(opt):
         producers = []
         # This does not work if we merge with the first loop, not sure why
         for device_id in range(nb_gpu):
+            # Get the iterator to generate from
             train_iter = get_train_iter(
                 opt, dynamic=True, stride=nb_gpu, offset=device_id)
             producer = mp.Process(target=batch_producer,

@@ -1,6 +1,6 @@
 """All options for dynamic running. Should be given in a yaml file."""
 from onmt.opts import _train_general_opts, config_opts, model_opts
-from onmt.dynamic.transform import AVAILABLE_TRANSFORMS
+from onmt.dynamic.transforms import AVAILABLE_TRANSFORMS
 
 
 def data_config_opts(parser):
@@ -61,48 +61,8 @@ def _dynamic_vocab_opts(parser):
 
 def _dynamic_transform_opts(parser):
     """Options related to transforms."""
-    group = parser.add_argument_group('transforms')
-    # Subword
-    group.add('-src_subword_model', '--src_subword_model',
-              help="Path of subword model for src (or shared).")
-    group.add('-tgt_subword_model', '--tgt_subword_model',
-              help="Path of subword model for tgt.")
-
-    group.add('-subword_nbest', '--subword_nbest', type=int, default=1,
-              help="number of (n_best) candidate in subword regularization."
-              "Valid for unigram sampling, invalid for BPE-dropout.")
-    group.add('-subword_alpha', '--subword_alpha', type=float, default=0,
-              help="Smoothing parameter for sentencepiece unigram sampling,"
-              "and dropout probability for BPE-dropout.")
-
-    group.add('-src_subword_type', '--src_subword_type',
-              type=str, default='none',
-              choices=['none', 'sentencepiece', 'bpe'],
-              help="Type of subword model for src (or shared) in onmttok.")
-    group.add('-tgt_subword_type', '--tgt_subword_type',
-              type=str, default='none',
-              choices=['none', 'sentencepiece', 'bpe'],
-              help="Type of subword model for tgt in onmttok.")
-    group.add('-onmttok_kwargs', '--onmttok_kwargs', type=str,
-              default="{'mode': 'none'}",
-              help="Accept any OpenNMT Tokenizer's options in dict string,"
-              "except subword related options listed earlier.")
-    # Sampling
-    group.add('-switchout_temperature', '--switchout_temperature',
-              type=float, default=1.0,
-              help="sampling temperature for switchout. tau^(-1) in paper."
-              "Smaller value makes data more diverse.")
-    group.add('-tokendrop_temperature', '--tokendrop_temperature',
-              type=float, default=1.0,
-              help="sampling temperature for token deletion.")
-    group.add('-tokenmask_temperature', '--tokenmask_temperature',
-              type=float, default=1.0,
-              help="sampling temperature for token masking.")
-    # Filter
-    group.add('--src_seq_length', '-src_seq_length', type=int, default=200,
-              help="Maximum source sequence length")
-    group.add('--tgt_seq_length', '-tgt_seq_length', type=int, default=200,
-              help="Maximum target sequence length")
+    for name, transform_cls in AVAILABLE_TRANSFORMS.items():
+        transform_cls.add_options(parser)
 
 
 def dynamic_preprocess_opts(parser):

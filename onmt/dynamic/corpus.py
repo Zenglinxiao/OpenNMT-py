@@ -1,10 +1,7 @@
 """Module that contain shard utils for dynamic data."""
 import os
-import re
-from collections import defaultdict
-from itertools import cycle
 from onmt.utils.logging import logger
-from onmt.dynamic.transform import TransformPipe
+from onmt.dynamic.transforms import TransformPipe
 
 from collections import Counter
 
@@ -44,9 +41,10 @@ def get_corpora(opts, is_train=False):
     corpora_dict = {}
     if is_train:
         for corpus_id, corpus_dict in opts.data.items():
-            corpora_dict[corpus_id] = ParallelCorpus(
-                corpus_dict["path_src"],
-                corpus_dict["path_tgt"])
+            if corpus_id != VALID_CORPUS_NAME:
+                corpora_dict[corpus_id] = ParallelCorpus(
+                    corpus_dict["path_src"],
+                    corpus_dict["path_tgt"])
     else:
         if VALID_CORPUS_NAME in opts.data.keys():
             corpora_dict[VALID_CORPUS_NAME] = ParallelCorpus(
@@ -151,12 +149,10 @@ def save_transformed_sample(opts, transforms, n_sample=3, build_vocab=False):
             for i, example in enumerate(c_iter):
                 src, tgt, transform, cid, index = example
                 maybe_item = transform.apply(src, tgt, corpus_name=cid)
-                if maybe_item is not None:
-                    src, tgt = maybe_item
-                else:
+                if maybe_item is None:
                     continue
-                example = [src, tgt, index]
-                item_list = []
+                src, tgt = maybe_item
+                # example = [src, tgt, index]
                 if build_vocab:
                     counter_src.update(src)
                     counter_tgt.update(tgt)

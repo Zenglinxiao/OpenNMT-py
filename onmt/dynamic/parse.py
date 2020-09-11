@@ -41,7 +41,7 @@ class DynamicArgumentParser(ArgumentParser):
 
     @classmethod
     def _validate_transforms(cls, opt):
-        assert 0 < opt.subword_alpha < 1, \
+        assert 0 <= opt.subword_alpha <= 1, \
             "subword_alpha should be in the range [0, 1]"
         kwargs_dict = eval(opt.onmttok_kwargs)
         if not isinstance(kwargs_dict, dict):

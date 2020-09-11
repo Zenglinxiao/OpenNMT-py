@@ -11,4 +11,4 @@ opencv-python
 git+https://github.com/NVIDIA/apex
 pretrainedmodels
 sentencepiece>=0.1.90
-subword-nmt
+subword-nmt>=0.3.7

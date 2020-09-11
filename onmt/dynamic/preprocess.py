@@ -5,7 +5,7 @@ from onmt.dynamic.parse import DynamicArgumentParser
 from onmt.dynamic.opts import dynamic_preprocess_opts
 from onmt.dynamic.corpus import save_transformed_sample
 from onmt.dynamic.vocab import build_dynamic_fields, save_fields
-from onmt.dynamic.transform import make_transforms, save_transforms, \
+from onmt.dynamic.transforms import make_transforms, save_transforms, \
     get_specials, get_transforms_cls
 
 
