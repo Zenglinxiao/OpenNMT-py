@@ -24,13 +24,14 @@ jobs:
     - name: "Build Docs"
       install:
         - pip install doctr
-        - pip install coverage
       script:
         - pip install -r docs/requirements.txt
         - set -e
         - cd docs/ && make html && cd ..
         - doctr deploy --built-docs docs/build/html/ .
     - name: "Unit tests"
+      install:
+        - pip install coverage
       # Please also add tests to `test/pull_request_chk.sh`.
       script:
         - coverage run -m unittest discover
@@ -61,6 +62,6 @@ jobs:
         - PYTHONPATH=$PYTHONPATH:. coverage run tools/embeddings_to_torch.py -emb_file_enc onmt/tests/sample_glove.txt -emb_file_dec onmt/tests/sample_glove.txt -dict_file /tmp/onmt.train.check.vocab.pt -output_file /tmp/q_gloveembeddings && rm /tmp/q_gloveembeddings; rm /tmp/onmt.train.check.*.pt
         - PYTHONPATH=$PYTHONPATH:. coverage run tools/extract_embeddings.py -model onmt/tests/test_model.pt
 
-# Push the results back to codecov
-after_success:
-  - codecov
+      # Push the results back to codecov
+      after_success:
+        - codecov
